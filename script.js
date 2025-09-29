@@ -38,9 +38,14 @@ class MonitoringSystem {
     }
 
     async fetchData() {
-        const url = `${SCRIPT_URL}?sheet=${encodeURIComponent(this.currentSheet)}`;
-        console.log('Fetching from:', url);
-        
+    // Gunakan CORS proxy untuk bypass CORS error
+    const proxyUrl = 'https://api.allorigins.win/raw?url=';
+    const targetUrl = `${SCRIPT_URL}?sheet=${encodeURIComponent(this.currentSheet)}`;
+    const url = proxyUrl + encodeURIComponent(targetUrl);
+    
+    console.log('Fetching from:', url);
+    
+    try {
         const response = await fetch(url);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
@@ -49,7 +54,11 @@ class MonitoringSystem {
         const data = await response.json();
         console.log('Data received:', data);
         return data;
+    } catch (error) {
+        console.error('Fetch error:', error);
+        throw error;
     }
+}
 
     renderTable(data) {
         if (!data || data.length === 0) {

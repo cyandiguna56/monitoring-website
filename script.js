@@ -23,61 +23,59 @@ class MonitoringSystem {
         });
     }
 
-    asyncasync loadData() {
-    this.showLoading(true);
-    
-    try {
-        const data = await this.fetchData();
-        this.renderTable(data);
-    } catch (error) {
-        console.error('Error loading data:', error);
-        // TAMPILKAN ERROR ASLI, bukan demo data
-        this.showError('Gagal memuat data: ' + error.message);
-    } finally {
-        this.showLoading(false);
-    }
-}
-
-async fetchData() {
-    const url = `${SCRIPT_URL}?sheet=${encodeURIComponent(this.currentSheet)}`;
-    console.log('Fetching from:', url);
-    
-    try {
-        // Approach 1: Direct fetch
-        const response = await fetch(url);
+    async loadData() {
+        this.showLoading(true);
         
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        console.log('Data received:', data);
-        return data;
-        
-    } catch (error) {
-        console.error('Direct fetch failed:', error);
-        
-        // Approach 2: Coba dengan CORS proxy untuk diagnostic
         try {
-            const proxyUrl = 'https://api.allorigins.win/raw?url=';
-            const targetUrl = `${SCRIPT_URL}?sheet=${encodeURIComponent(this.currentSheet)}`;
-            const proxyResponse = await fetch(proxyUrl + encodeURIComponent(targetUrl));
-            
-            if (proxyResponse.ok) {
-                const proxyData = await proxyResponse.json();
-                console.log('Data received via proxy (but will not use):', proxyData);
-                // Tetap lempar error asli untuk konsistensi
-                throw new Error(`CORS Issue - Data bisa diakses via proxy. Error asli: ${error.message}`);
-            } else {
-                throw new Error(`Proxy juga gagal. Error asli: ${error.message}`);
-            }
-        } catch (proxyError) {
-            throw new Error(`Semua method gagal. Error asli: ${error.message}, Proxy error: ${proxyError.message}`);
+            const data = await this.fetchData();
+            this.renderTable(data);
+        } catch (error) {
+            console.error('Error loading data:', error);
+            // TAMPILKAN ERROR ASLI, bukan demo data
+            this.showError('Gagal memuat data: ' + error.message);
+        } finally {
+            this.showLoading(false);
         }
     }
-}
 
-// Hapus function getDemoData karena tidak digunakan lagi
+    async fetchData() {
+        const url = `${SCRIPT_URL}?sheet=${encodeURIComponent(this.currentSheet)}`;
+        console.log('Fetching from:', url);
+        
+        try {
+            // Approach 1: Direct fetch
+            const response = await fetch(url);
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            console.log('Data received:', data);
+            return data;
+            
+        } catch (error) {
+            console.error('Direct fetch failed:', error);
+            
+            // Approach 2: Coba dengan CORS proxy untuk diagnostic
+            try {
+                const proxyUrl = 'https://api.allorigins.win/raw?url=';
+                const targetUrl = `${SCRIPT_URL}?sheet=${encodeURIComponent(this.currentSheet)}`;
+                const proxyResponse = await fetch(proxyUrl + encodeURIComponent(targetUrl));
+                
+                if (proxyResponse.ok) {
+                    const proxyData = await proxyResponse.json();
+                    console.log('Data received via proxy (but will not use):', proxyData);
+                    // Tetap lempar error asli untuk konsistensi
+                    throw new Error(`CORS Issue - Data bisa diakses via proxy. Error asli: ${error.message}`);
+                } else {
+                    throw new Error(`Proxy juga gagal. Error asli: ${error.message}`);
+                }
+            } catch (proxyError) {
+                throw new Error(`Semua method gagal. Error asli: ${error.message}, Proxy error: ${proxyError.message}`);
+            }
+        }
+    }
 
     renderTable(data) {
         if (!data || data.length === 0) {

@@ -1,5 +1,5 @@
 // KONFIGURASI - GUNAKAN URL SCRIPT WEBSITE ANDA
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxjKGJv1uRIkqt9Ey1zJ0Efz5gCIWsbd-V1HlfTHlDtFu3PMvta4MhJ6MLqOohEgnN7Lg/exec';
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx2Y3NY28vEyqPWNuaYg4CaYTMoejwtBsgoGxbZkCNzF28UgASY9iun9DAlOyB8HUZphw/exec';
 
 class MonitoringSystem {
     constructor() {

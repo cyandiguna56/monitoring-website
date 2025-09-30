@@ -82,14 +82,23 @@
     <script src="auth.js"></script>
     <script src="script.js"></script>
     <script>
-        // Protection middleware
-        if (auth.requireAuth()) {
-            auth.updateUserInfo();
-            // Initialize monitoring system setelah auth berhasil
-            document.addEventListener('DOMContentLoaded', () => {
-                new MonitoringSystem();
-            });
-        }
+        // Protection middleware - DIPERBAIKI
+        document.addEventListener('DOMContentLoaded', function() {
+            if (auth.requireAuth()) {
+                auth.updateUserInfo();
+                // Initialize monitoring system setelah auth berhasil
+                try {
+                    new MonitoringSystem();
+                } catch (error) {
+                    console.error('Error initializing MonitoringSystem:', error);
+                    // Force hide loading jika ada error
+                    const loadingElement = document.getElementById('loading');
+                    if (loadingElement) {
+                        loadingElement.style.display = 'none';
+                    }
+                }
+            }
+        });
     </script>
 </body>
 </html>

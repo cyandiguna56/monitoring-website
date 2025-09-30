@@ -4,6 +4,7 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzOHv6wLb9QzXaDtc0eK
 class MonitoringSystem {
     constructor() {
         this.currentSheet = 'MONITORING LOKAL';
+        this.isLoading = false;
         
         // Check authentication sebelum init
         if (typeof auth !== 'undefined' && !auth.isLoggedIn()) {
@@ -11,14 +12,6 @@ class MonitoringSystem {
             return;
         }
         
-        this.init();
-    }
-// KONFIGURASI - GUNAKAN URL SCRIPT WEBSITE ANDA
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzOHv6wLb9QzXaDtc0eKy1xYP1ojg5-GXzwsLmXxfLV0eGQH_MSTnpaazkVsrmKIXLy5w/exec';
-
-class MonitoringSystem {
-    constructor() {
-        this.currentSheet = 'MONITORING LOKAL';
         this.init();
     }
 
@@ -39,16 +32,26 @@ class MonitoringSystem {
     }
 
     async loadData() {
+        // Prevent multiple simultaneous loads
+        if (this.isLoading) return;
+        
+        this.isLoading = true;
         this.showLoading(true);
         
+        // Timeout protection - maksimal 30 detik
+        const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Timeout: Gagal memuat data dalam 30 detik')), 30000);
+        });
+        
         try {
-            const data = await this.fetchData();
+            const dataPromise = this.fetchData();
+            const data = await Promise.race([dataPromise, timeoutPromise]);
             this.renderTable(data);
         } catch (error) {
             console.error('Error loading data:', error);
-            // TAMPILKAN ERROR ASLI, bukan demo data
             this.showError('Gagal memuat data: ' + error.message);
         } finally {
+            this.isLoading = false;
             this.showLoading(false);
         }
     }
@@ -58,8 +61,12 @@ class MonitoringSystem {
         console.log('Fetching from:', url);
         
         try {
-            // Approach 1: Direct fetch
-            const response = await fetch(url);
+            // Approach 1: Direct fetch dengan timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000);
+            
+            const response = await fetch(url, { signal: controller.signal });
+            clearTimeout(timeoutId);
             
             if (!response.ok) {
                 throw new Error(`HTTP error! status: ${response.status}`);
@@ -72,26 +79,31 @@ class MonitoringSystem {
         } catch (error) {
             console.error('Direct fetch failed:', error);
             
-            // Approach 2: Coba dengan CORS proxy untuk diagnostic
+            if (error.name === 'AbortError') {
+                throw new Error('Request timeout - server tidak merespons');
+            }
+            
+            // Approach 2: Coba dengan CORS proxy
             try {
+                console.log('Trying with CORS proxy...');
                 const proxyUrl = 'https://api.allorigins.win/raw?url=';
                 const targetUrl = `${SCRIPT_URL}?sheet=${encodeURIComponent(this.currentSheet)}`;
                 const proxyResponse = await fetch(proxyUrl + encodeURIComponent(targetUrl));
                 
                 if (proxyResponse.ok) {
                     const proxyData = await proxyResponse.json();
-                    console.log('Data received via proxy (but will not use):', proxyData);
-                    // Tetap lempar error asli untuk konsistensi
-                    throw new Error(`CORS Issue - Data bisa diakses via proxy. Error asli: ${error.message}`);
+                    console.log('Data received via proxy:', proxyData);
+                    return proxyData;
                 } else {
-                    throw new Error(`Proxy juga gagal. Error asli: ${error.message}`);
+                    throw new Error(`Proxy juga gagal. Status: ${proxyResponse.status}`);
                 }
             } catch (proxyError) {
-                throw new Error(`Semua method gagal. Error asli: ${error.message}, Proxy error: ${proxyError.message}`);
+                throw new Error(`Semua method gagal. Error: ${error.message}`);
             }
         }
     }
 
+    // ... (renderTable, formatHeader, dan method lainnya tetap sama)
     renderTable(data) {
         if (!data || data.length === 0) {
             this.showError('Tidak ada data ditemukan');
@@ -212,25 +224,25 @@ class MonitoringSystem {
         
         if (show) {
             loadingElement.style.display = 'block';
-            tableElement.classList.add('loading');
+            if (tableElement) tableElement.classList.add('loading');
         } else {
             loadingElement.style.display = 'none';
-            tableElement.classList.remove('loading');
+            if (tableElement) tableElement.classList.remove('loading');
         }
     }
 
     showError(message) {
         const tbody = document.getElementById('tableBody');
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="100" class="text-center text-danger py-4">
-                    <i class="fas fa-exclamation-triangle me-2"></i>${message}
-                </td>
-            </tr>
-        `;
+        if (tbody) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="100" class="text-center text-danger py-4">
+                        <i class="fas fa-exclamation-triangle me-2"></i>${message}
+                    </td>
+                </tr>
+            `;
+        }
+        // Pastikan loading dihide ketika error
+        this.showLoading(false);
     }
 }
-
-document.addEventListener('DOMContentLoaded', () => {
-    new MonitoringSystem();
-});

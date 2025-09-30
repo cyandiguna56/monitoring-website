@@ -4,6 +4,21 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzOHv6wLb9QzXaDtc0eK
 class MonitoringSystem {
     constructor() {
         this.currentSheet = 'MONITORING LOKAL';
+        
+        // Check authentication sebelum init
+        if (typeof auth !== 'undefined' && !auth.isLoggedIn()) {
+            window.location.href = 'login.html';
+            return;
+        }
+        
+        this.init();
+    }
+// KONFIGURASI - GUNAKAN URL SCRIPT WEBSITE ANDA
+const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzOHv6wLb9QzXaDtc0eKy1xYP1ojg5-GXzwsLmXxfLV0eGQH_MSTnpaazkVsrmKIXLy5w/exec';
+
+class MonitoringSystem {
+    constructor() {
+        this.currentSheet = 'MONITORING LOKAL';
         this.init();
     }
 

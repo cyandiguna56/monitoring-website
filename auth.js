@@ -32,8 +32,29 @@ class AuthSystem {
             });
         }
 
-        // Check for logout action
+        // Check for logout action - DIPERBAIKI
         this.checkLogout();
+        
+        // Bind logout buttons - BARU
+        this.bindLogoutButtons();
+    }
+
+    // METHOD BARU: Bind semua tombol logout
+    bindLogoutButtons() {
+        // Bind logout link di navbar
+        const logoutLinks = document.querySelectorAll('a[href*="logout"]');
+        logoutLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.logout();
+            });
+        });
+        
+        // Bind juga untuk URL parameter fallback
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('logout') === 'true') {
+            this.logout();
+        }
     }
 
     handleLogin() {
@@ -67,11 +88,22 @@ class AuthSystem {
         this.redirectToDashboard();
     }
 
+    // METHOD LOGOUT YANG DIPERBAIKI
     logout() {
+        console.log('Logging out user...');
+        
+        // Clear semua data auth
         localStorage.removeItem('isLoggedIn');
         localStorage.removeItem('username');
         localStorage.removeItem('loginTime');
-        window.location.href = 'login.html';
+        
+        // Clear session storage juga untuk memastikan
+        sessionStorage.clear();
+        
+        // Redirect ke login page dengan cache busting
+        setTimeout(() => {
+            window.location.href = 'login.html?logout=true&t=' + new Date().getTime();
+        }, 100);
     }
 
     isLoggedIn() {

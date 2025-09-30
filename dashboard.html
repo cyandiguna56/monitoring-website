@@ -13,6 +13,8 @@
         .loading { opacity: 0.6; pointer-events: none; }
         body { background-color: #f8f9fa; padding: 20px 0; }
         .user-info { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .logout-btn { cursor: pointer; }
+        .logout-btn:hover { opacity: 0.8; }
     </style>
 </head>
 <body>
@@ -26,9 +28,10 @@
                     <i class="fas fa-user me-1"></i>
                     <span id="currentUser"></span>
                 </span>
-                <a class="nav-link text-light" href="login.html?logout=true">
+                <!-- LOGOUT BUTTON YANG DIPERBAIKI -->
+                <span class="nav-link text-light logout-btn" id="logoutBtn">
                     <i class="fas fa-sign-out-alt me-1"></i>Logout
-                </a>
+                </span>
             </div>
         </div>
     </nav>
@@ -86,6 +89,17 @@
         document.addEventListener('DOMContentLoaded', function() {
             if (auth.requireAuth()) {
                 auth.updateUserInfo();
+                
+                // Bind manual logout button untuk backup
+                const logoutBtn = document.getElementById('logoutBtn');
+                if (logoutBtn) {
+                    logoutBtn.addEventListener('click', function() {
+                        if (confirm('Yakin ingin logout?')) {
+                            auth.logout();
+                        }
+                    });
+                }
+                
                 // Initialize monitoring system setelah auth berhasil
                 try {
                     new MonitoringSystem();

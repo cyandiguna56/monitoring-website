@@ -17,44 +17,67 @@ class AuthSystem {
     }
 
     init() {
+        console.log('AuthSystem initialized on:', window.location.pathname);
+        
         // Check if user already logged in
-        if (this.isLoggedIn() && window.location.pathname.includes('login.html')) {
+        if (this.isLoggedIn() && this.isLoginPage()) {
+            console.log('User already logged in, redirecting to dashboard');
             this.redirectToDashboard();
             return;
         }
 
         // Bind login form jika di halaman login
+        if (this.isLoginPage()) {
+            this.bindLoginForm();
+        }
+
+        // Bind logout buttons hanya jika di dashboard
+        if (this.isDashboardPage()) {
+            this.bindLogoutButtons();
+        }
+
+        // Check for logout action
+        this.checkLogout();
+    }
+
+    // METHOD BARU: Cek apakah di halaman login
+    isLoginPage() {
+        return window.location.pathname.includes('login.html') || 
+               window.location.pathname === '/' ||
+               window.location.pathname.includes('index.html');
+    }
+
+    // METHOD BARU: Cek apakah di halaman dashboard
+    isDashboardPage() {
+        return window.location.pathname.includes('dashboard.html');
+    }
+
+    // METHOD BARU: Bind login form terpisah
+    bindLoginForm() {
         const loginForm = document.getElementById('loginForm');
         if (loginForm) {
+            console.log('Binding login form');
             loginForm.addEventListener('submit', (e) => {
                 e.preventDefault();
                 this.handleLogin();
             });
         }
-
-        // Check for logout action - DIPERBAIKI
-        this.checkLogout();
-        
-        // Bind logout buttons - BARU
-        this.bindLogoutButtons();
     }
 
     // METHOD BARU: Bind semua tombol logout
     bindLogoutButtons() {
+        console.log('Binding logout buttons');
+        
         // Bind logout link di navbar
-        const logoutLinks = document.querySelectorAll('a[href*="logout"]');
+        const logoutLinks = document.querySelectorAll('a[href*="logout"], .logout-btn');
         logoutLinks.forEach(link => {
             link.addEventListener('click', (e) => {
                 e.preventDefault();
-                this.logout();
+                if (confirm('Yakin ingin logout?')) {
+                    this.logout();
+                }
             });
         });
-        
-        // Bind juga untuk URL parameter fallback
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('logout') === 'true') {
-            this.logout();
-        }
     }
 
     handleLogin() {
@@ -62,13 +85,17 @@ class AuthSystem {
         const password = document.getElementById('password').value;
         const errorAlert = document.getElementById('errorAlert');
 
+        console.log('Login attempt for:', username);
+
         // Reset error
         errorAlert.classList.add('d-none');
 
         // Validate credentials
         if (this.authenticate(username, password)) {
+            console.log('Login successful');
             this.login(username);
         } else {
+            console.log('Login failed');
             errorAlert.textContent = 'Username atau password salah!';
             errorAlert.classList.remove('d-none');
         }
@@ -79,6 +106,8 @@ class AuthSystem {
     }
 
     login(username) {
+        console.log('Logging in:', username);
+        
         // Save to localStorage
         localStorage.setItem('isLoggedIn', 'true');
         localStorage.setItem('username', username);
@@ -97,17 +126,14 @@ class AuthSystem {
         localStorage.removeItem('username');
         localStorage.removeItem('loginTime');
         
-        // Clear session storage juga untuk memastikan
-        sessionStorage.clear();
-        
         // Redirect ke login page dengan cache busting
-        setTimeout(() => {
-            window.location.href = 'login.html?logout=true&t=' + new Date().getTime();
-        }, 100);
+        window.location.href = 'login.html?logout=true&t=' + new Date().getTime();
     }
 
     isLoggedIn() {
-        return localStorage.getItem('isLoggedIn') === 'true';
+        const loggedIn = localStorage.getItem('isLoggedIn') === 'true';
+        console.log('isLoggedIn check:', loggedIn);
+        return loggedIn;
     }
 
     getCurrentUser() {
@@ -115,22 +141,26 @@ class AuthSystem {
     }
 
     redirectToDashboard() {
+        console.log('Redirecting to dashboard');
         window.location.href = 'dashboard.html';
     }
 
     checkLogout() {
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('logout') === 'true') {
-            this.logout();
+            console.log('Logout parameter detected');
+            // Tidak perlu panggil logout() di sini karena akan infinite loop
         }
     }
 
     // Middleware untuk halaman yang diproteksi
     requireAuth() {
         if (!this.isLoggedIn()) {
+            console.log('Authentication required, redirecting to login');
             window.location.href = 'login.html';
             return false;
         }
+        console.log('User authenticated:', this.getCurrentUser());
         return true;
     }
 
@@ -144,4 +174,5 @@ class AuthSystem {
 }
 
 // Initialize auth system
+console.log('=== AUTH SYSTEM LOADED ===');
 const auth = new AuthSystem();

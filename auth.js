@@ -18,12 +18,12 @@ class AuthSystem {
 
     init() {
         // Check if user already logged in
-        if (this.isLoggedIn()) {
+        if (this.isLoggedIn() && window.location.pathname.includes('login.html')) {
             this.redirectToDashboard();
             return;
         }
 
-        // Bind login form
+        // Bind login form jika di halaman login
         const loginForm = document.getElementById('loginForm');
         if (loginForm) {
             loginForm.addEventListener('submit', (e) => {
@@ -113,8 +113,3 @@ class AuthSystem {
 
 // Initialize auth system
 const auth = new AuthSystem();
-
-// Export untuk digunakan di file lain
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { auth, USERS };
-}

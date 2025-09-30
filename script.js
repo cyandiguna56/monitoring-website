@@ -3,11 +3,13 @@ const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzOHv6wLb9QzXaDtc0eK
 
 class MonitoringSystem {
     constructor() {
+        console.log('MonitoringSystem initialized');
         this.currentSheet = 'MONITORING LOKAL';
         this.isLoading = false;
         
         // Check authentication sebelum init
         if (typeof auth !== 'undefined' && !auth.isLoggedIn()) {
+            console.log('User not authenticated, redirecting to login');
             window.location.href = 'login.html';
             return;
         }
@@ -16,24 +18,54 @@ class MonitoringSystem {
     }
 
     init() {
-        this.bindEvents();
-        this.loadData();
+        console.log('Initializing MonitoringSystem...');
+        try {
+            this.bindEvents();
+            this.loadData();
+        } catch (error) {
+            console.error('Error in MonitoringSystem init:', error);
+            this.showError('Error initializing system: ' + error.message);
+        }
     }
 
     bindEvents() {
-        document.getElementById('refreshBtn').addEventListener('click', () => {
+        console.log('Binding events...');
+        
+        const refreshBtn = document.getElementById('refreshBtn');
+        const sheetSelect = document.getElementById('sheetSelect');
+        
+        // CHECK IF ELEMENTS EXIST
+        if (!refreshBtn) {
+            console.error('Refresh button not found');
+            return;
+        }
+        if (!sheetSelect) {
+            console.error('Sheet select not found');
+            return;
+        }
+        
+        refreshBtn.addEventListener('click', () => {
+            console.log('Refresh button clicked');
             this.loadData();
         });
 
-        document.getElementById('sheetSelect').addEventListener('change', (e) => {
+        sheetSelect.addEventListener('change', (e) => {
+            console.log('Sheet changed to:', e.target.value);
             this.currentSheet = e.target.value;
             this.loadData();
         });
+        
+        console.log('Events bound successfully');
     }
 
     async loadData() {
+        console.log('loadData called, isLoading:', this.isLoading);
+        
         // Prevent multiple simultaneous loads
-        if (this.isLoading) return;
+        if (this.isLoading) {
+            console.log('Already loading, skipping...');
+            return;
+        }
         
         this.isLoading = true;
         this.showLoading(true);
@@ -44,13 +76,16 @@ class MonitoringSystem {
         });
         
         try {
+            console.log('Starting data fetch...');
             const dataPromise = this.fetchData();
             const data = await Promise.race([dataPromise, timeoutPromise]);
+            console.log('Data fetch completed, rendering table...');
             this.renderTable(data);
         } catch (error) {
             console.error('Error loading data:', error);
             this.showError('Gagal memuat data: ' + error.message);
         } finally {
+            console.log('loadData finished, setting isLoading to false');
             this.isLoading = false;
             this.showLoading(false);
         }
@@ -65,6 +100,7 @@ class MonitoringSystem {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 15000);
             
+            console.log('Attempting direct fetch...');
             const response = await fetch(url, { signal: controller.signal });
             clearTimeout(timeoutId);
             
@@ -73,7 +109,7 @@ class MonitoringSystem {
             }
             
             const data = await response.json();
-            console.log('Data received:', data);
+            console.log('Data received via direct fetch:', data);
             return data;
             
         } catch (error) {
@@ -103,20 +139,34 @@ class MonitoringSystem {
         }
     }
 
-    // ... (renderTable, formatHeader, dan method lainnya tetap sama)
     renderTable(data) {
-        if (!data || data.length === 0) {
+        console.log('renderTable called with data:', data);
+        
+        if (!data || !Array.isArray(data) || data.length === 0) {
+            console.log('No data to render');
             this.showError('Tidak ada data ditemukan');
             return;
         }
 
         const headers = Object.keys(data[0]);
+        if (!headers || headers.length === 0) {
+            console.log('No headers found in data');
+            this.showError('Format data tidak valid');
+            return;
+        }
+        
+        console.log('Rendering table with headers:', headers);
         this.renderHeader(headers);
         this.renderBody(data, headers);
     }
 
     renderHeader(headers) {
         const headerRow = document.getElementById('tableHeader');
+        if (!headerRow) {
+            console.error('Table header element not found');
+            return;
+        }
+        
         headerRow.innerHTML = '';
 
         headers.forEach(header => {
@@ -129,9 +179,14 @@ class MonitoringSystem {
 
     renderBody(data, headers) {
         const tbody = document.getElementById('tableBody');
+        if (!tbody) {
+            console.error('Table body element not found');
+            return;
+        }
+        
         tbody.innerHTML = '';
 
-        data.forEach(row => {
+        data.forEach((row, index) => {
             const tr = document.createElement('tr');
             
             headers.forEach(header => {
@@ -154,6 +209,8 @@ class MonitoringSystem {
             
             tbody.appendChild(tr);
         });
+        
+        console.log('Table rendered with', data.length, 'rows');
     }
 
     formatHeader(header) {
@@ -222,6 +279,13 @@ class MonitoringSystem {
         const loadingElement = document.getElementById('loading');
         const tableElement = document.getElementById('monitoringTable');
         
+        if (!loadingElement) {
+            console.error('Loading element not found');
+            return;
+        }
+        
+        console.log('showLoading:', show);
+        
         if (show) {
             loadingElement.style.display = 'block';
             if (tableElement) tableElement.classList.add('loading');
@@ -232,6 +296,7 @@ class MonitoringSystem {
     }
 
     showError(message) {
+        console.log('Showing error:', message);
         const tbody = document.getElementById('tableBody');
         if (tbody) {
             tbody.innerHTML = `

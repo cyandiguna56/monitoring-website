@@ -10,6 +10,23 @@ const SHEETS = ['MONITORING PISANG', 'MONITORING LOKAL', 'MONITORING FMCG', 'MON
 // =======================================
 // UTIL
 // =======================================
+function normalizeType(u) {
+  const t = (fmt(u.JENIS_MUATAN) || '').toUpperCase();
+  if (t.includes('PISANG')) return 'PISANG';
+  if (t.includes('LOKAL'))  return 'LOKAL';
+  if (t.includes('FMCG'))   return 'FMCG';
+  if (t.includes('IMPORT')) return 'IMPORT';
+
+  // Fallback dari nama sheet
+  const s = (u.__sheet || '').toUpperCase();
+  if (s.includes('PISANG')) return 'PISANG';
+  if (s.includes('LOKAL'))  return 'LOKAL';
+  if (s.includes('FMCG'))   return 'FMCG';
+  if (s.includes('IMPORT')) return 'IMPORT';
+
+  return 'LOKAL'; // default aman
+}
+
 function statusFromRow(row) {
   const hasStart = row.START && String(row.START).trim() !== '';
   const hasFinish = row.FINISH && String(row.FINISH).trim() !== '';
@@ -33,7 +50,7 @@ function fmt(text) {
 // =======================================
 let currentMode = 'checker';           // 'checker' | 'receiving'
 let currentFilter = 'ALL';             // Jenis muatan filter (checker)
-let currentReceivingFilter = 'PISANG'; // Jenis muatan filter (receiving)
+let currentfilterFilter = 'PISANG'; // Jenis muatan filter (filter)
 let allUnits = [];                     // gabungan 4 sheet
 
 class MonitoringSystem {
@@ -44,17 +61,17 @@ class MonitoringSystem {
 
   bindNav() {
     // Mode nav
-    const navRec = document.getElementById('nav-receiving');
+    const navRec = document.getElementById('nav-filter');
     const navChk = document.getElementById('nav-checker');
     const reloadBtn = document.getElementById('reloadBtn');
 
     navRec.addEventListener('click', () => {
-      currentMode = 'receiving';
+      currentMode = 'filter';
       navRec.className = 'btn';
       navChk.className = 'btn-ghost';
-      document.getElementById('receiving-page').classList.remove('hidden');
+      document.getElementById('filter-page').classList.remove('hidden');
       document.getElementById('checker-page').classList.add('hidden');
-      this.renderReceiving();
+      this.renderfilter();
     });
 
     navChk.addEventListener('click', () => {
@@ -62,20 +79,20 @@ class MonitoringSystem {
       navChk.className = 'btn';
       navRec.className = 'btn-ghost';
       document.getElementById('checker-page').classList.remove('hidden');
-      document.getElementById('receiving-page').classList.add('hidden');
+      document.getElementById('filter-page').classList.add('hidden');
       this.renderChecker();
     });
 
     reloadBtn.addEventListener('click', () => this.loadAllData());
 
-    // Receiving filter tabs
+    // filter filter tabs
     document.querySelectorAll('[data-rec]').forEach(btn => {
       btn.addEventListener('click', () => {
-        currentReceivingFilter = btn.dataset.rec;
+        currentfilterFilter = btn.dataset.rec;
         document.querySelectorAll('[data-rec]').forEach(b => b.classList.remove('tab-active'));
         btn.classList.add('tab-active');
-        document.getElementById('receiving-title').textContent = `Unit ${currentReceivingFilter}`;
-        this.renderReceiving();
+        document.getElementById('filter-title').textContent = `Unit ${currentfilterFilter}`;
+        this.renderfilter();
       });
     });
 
@@ -123,7 +140,7 @@ class MonitoringSystem {
         });
       });
       this.updateCounts();
-      (currentMode === 'checker') ? this.renderChecker() : this.renderReceiving();
+      (currentMode === 'checker') ? this.renderChecker() : this.renderfilter();
     } catch (err) {
       console.error('Gagal memuat data:', err);
       alert('Gagal memuat data. Coba Reload.');
@@ -150,14 +167,14 @@ class MonitoringSystem {
   }
 
   // =========================
-  // RENDER: RECEIVING
+  // RENDER: filter
   // =========================
-  renderReceiving() {
-    const container = document.getElementById('receiving-units');
-    const empty = document.getElementById('receiving-empty');
+  renderfilter() {
+    const container = document.getElementById('filter-units');
+    const empty = document.getElementById('filter-empty');
     container.innerHTML = '';
 
-    const filtered = allUnits.filter(u => fmt(u.JENIS_MUATAN) === currentReceivingFilter);
+    const filtered = allUnits.filter(u => normalizeType(u) === currentReceivingFilter);
     if (filtered.length === 0) {
       empty.classList.remove('hidden');
       return;
@@ -261,7 +278,7 @@ class MonitoringSystem {
     qStandby.innerHTML = qProses.innerHTML = qSelesai.innerHTML = '';
 
     let list = allUnits;
-    if (currentFilter !== 'ALL') list = list.filter(u => fmt(u.JENIS_MUATAN) === currentFilter);
+    if (currentFilter !== 'ALL') list = list.filter(u => normalizeType(u) === currentFilter);
 
     const buckets = { STANDBY: [], PROSES: [], SELESAI: [] };
     list.forEach(u => buckets[statusFromRow(u)].push(u));
@@ -365,7 +382,7 @@ class MonitoringSystem {
   updateCounts() {
     const counts = { PISANG: 0, LOKAL: 0, FMCG: 0, IMPORT: 0 };
     allUnits.forEach(u => {
-      const t = fmt(u.JENIS_MUATAN);
+      const t = normalizeType(u);
       if (counts[t] != null) counts[t]++;
     });
     document.getElementById('count-pisang').textContent = counts.PISANG || 0;

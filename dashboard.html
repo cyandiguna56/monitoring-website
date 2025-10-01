@@ -1,333 +1,169 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - Monitoring System</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>">
-    <style>
-        :root {
-            --bg-primary: #667eea;
-            --bg-secondary: #764ba2;
-            --text-light: #f8f9fa;
-            --card-bg: #ffffff;
-            --body-bg: #f8f9fa;
-            --text-dark: #212529;
-            --table-border: #dee2e6;
-            --input-bg: #ffffff;
-            --input-border: #ced4da;
-            --input-text: #212529;
-            --success-color: #28a745;
-            --warning-color: #ffc107;
-            --danger-color: #dc3545;
-        }
-
-        [data-theme="dark"] {
-            --bg-primary: #2c3e50;
-            --bg-secondary: #34495e;
-            --text-light: #ecf0f1;
-            --card-bg: #2c3e50;
-            --body-bg: #1a1a1a;
-            --text-dark: #ecf0f1;
-            --table-border: #444;
-            --input-bg: #34495e;
-            --input-border: #4a6572;
-            --input-text: #ecf0f1;
-        }
-
-        body {
-            background-color: var(--body-bg);
-            color: var(--text-dark);
-            padding: 20px 0;
-            transition: background-color 0.3s, color 0.3s;
-        }
-
-        .user-info {
-            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-        }
-
-        .logout-btn {
-            cursor: pointer;
-            transition: opacity 0.2s;
-        }
-
-        .logout-btn:hover {
-            opacity: 0.8;
-        }
-
-        .table-responsive {
-            max-height: 600px;
-            border-radius: 8px;
-            overflow: hidden;
-        }
-
-        .status-badge {
-            font-size: 0.8em;
-            padding: 4px 8px;
-            border-radius: 4px;
-        }
-
-        .status-active {
-            background-color: var(--success-color);
-            color: white;
-        }
-
-        .status-warning {
-            background-color: var(--warning-color);
-            color: black;
-        }
-
-        .status-danger {
-            background-color: var(--danger-color);
-            color: white;
-        }
-
-        .loading {
-            opacity: 0.6;
-            pointer-events: none;
-        }
-
-        .card {
-            border: none;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            transition: box-shadow 0.3s;
-        }
-
-        .card:hover {
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
-        }
-
-        .card-header {
-            background-color: var(--card-bg);
-            border-bottom: 1px solid var(--table-border);
-        }
-
-        .table thead th {
-            position: sticky;
-            top: 0;
-            background-color: var(--bg-primary);
-            z-index: 10;
-        }
-
-        .theme-toggle {
-            background: none;
-            border: none;
-            color: var(--text-light);
-            font-size: 1.2rem;
-            cursor: pointer;
-            margin-right: 15px;
-        }
-
-        .error-message {
-            display: none;
-            padding: 10px;
-            margin: 10px 0;
-            border-radius: 4px;
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-
-        @media (max-width: 768px) {
-            .table-responsive {
-                max-height: 400px;
-            }
-            
-            .navbar-brand {
-                font-size: 1.1rem;
-            }
-            
-            .card-header .d-flex {
-                flex-direction: column;
-                gap: 10px;
-            }
-            
-            .card-header .d-flex > div {
-                width: 100%;
-                justify-content: space-between;
-            }
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <title>Receiving Checker System</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root { color-scheme: light; }
+    /* Grayscale-only theme */
+    .btn {
+      @apply px-4 py-2 rounded-md border border-neutral-300 text-neutral-800 bg-white hover:bg-neutral-100 transition;
+    }
+    .btn-primary {
+      @apply bg-neutral-900 text-white border-neutral-900 hover:bg-black;
+    }
+    .badge {
+      @apply inline-block text-xs px-2 py-0.5 rounded-full border border-neutral-300 text-neutral-700 bg-neutral-100;
+    }
+    .card { @apply bg-white border border-neutral-200 rounded-xl shadow-sm; }
+    .card-head { @apply px-6 py-4 border-b border-neutral-200; }
+    .card-body { @apply p-6; }
+    .muted { @apply text-neutral-500; }
+    .title { @apply text-xl font-semibold text-neutral-900; }
+    .subtitle { @apply text-sm text-neutral-600; }
+    .tab-active { @apply bg-neutral-900 text-white; }
+    .tab-inactive { @apply bg-white text-neutral-700 border border-neutral-300; }
+    .hidden { display: none; }
+  </style>
 </head>
-<body>
-    <nav class="navbar navbar-dark user-info">
-        <div class="container-fluid">
-            <span class="navbar-brand mb-0 h1">
-                <i class="fas fa-chart-line me-2"></i>Monitoring System
-            </span>
-            <div class="navbar-nav flex-row align-items-center">
-                <button class="theme-toggle" id="themeToggle" title="Toggle Dark/Light Mode">
-                    <i class="fas fa-moon"></i>
-                </button>
-                <span class="nav-link text-light me-3">
-                    <i class="fas fa-user me-1"></i>
-                    <span id="currentUser">User</span>
-                </span>
-                <span class="nav-link text-light logout-btn" id="logoutBtn">
-                    <i class="fas fa-sign-out-alt me-1"></i>Logout
-                </span>
-            </div>
+<body class="bg-neutral-50 min-h-screen">
+  <!-- Header -->
+  <header class="bg-white border-b border-neutral-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+      <div class="flex items-center justify-between">
+        <div class="flex gap-2">
+          <button id="nav-receiving" class="btn btn-primary">Receiving</button>
+          <button id="nav-checker" class="btn">Checker</button>
         </div>
-    </nav>
+        <div class="text-right">
+          <h1 class="text-2xl font-bold text-neutral-900">Sistem Manajemen</h1>
+          <p class="subtitle">Antrian Unit</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <div class="text-sm text-neutral-700">
+            <i class="fa-solid fa-user"></i>
+            <span id="currentUser">User</span>
+          </div>
+          <a href="#" class="btn" id="logoutBtn">Logout</a>
+        </div>
+      </div>
+    </div>
+  </header>
 
-    <div class="container-fluid mt-4">
-        <div class="row">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="card-title mb-0">
-                            <i class="fas fa-table me-2"></i>Data Monitoring
-                        </h5>
-                        <div class="d-flex align-items-center gap-2">
-                            <button id="refreshBtn" class="btn btn-sm btn-outline-primary">
-                                <i class="fas fa-sync-alt me-1"></i>Refresh
-                            </button>
-                            <select id="sheetSelect" class="form-select form-select-sm d-inline-block w-auto">
-                                <option value="MONITORING LOKAL">MONITORING LOKAL</option>
-                                <option value="MONITORING PISANG">MONITORING PISANG</option>
-                                <option value="MONITORING IMPORT">MONITORING IMPORT</option>
-                                <option value="MONITORING FMCG">MONITORING FMCG</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <div id="errorMessage" class="error-message">
-                            <i class="fas fa-exclamation-triangle me-2"></i>
-                            <span id="errorText">Terjadi kesalahan saat memuat data.</span>
-                        </div>
-                        <div class="table-responsive">
-                            <table class="table table-striped table-hover table-sm" id="monitoringTable">
-                                <thead class="table-dark sticky-top">
-                                    <tr id="tableHeader">
-                                        <!-- Header akan diisi oleh JavaScript -->
-                                    </tr>
-                                </thead>
-                                <tbody id="tableBody">
-                                    <!-- Data akan diisi oleh JavaScript -->
-                                </tbody>
-                            </table>
-                        </div>
-                        <div id="loading" class="text-center mt-3" style="display: none;">
-                            <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">Loading...</span>
-                            </div>
-                            <p class="mt-2">Memuat data...</p>
-                        </div>
-                        <div id="noData" class="text-center mt-3" style="display: none;">
-                            <i class="fas fa-database fa-2x text-muted mb-2"></i>
-                            <p class="text-muted">Tidak ada data yang tersedia.</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
+  <!-- RECEIVING PAGE -->
+  <section id="receiving-page" class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+    <div class="card mb-6">
+      <div class="card-head">
+        <div class="flex flex-wrap gap-2">
+          <button data-rfilter="PISANG" class="btn tab-active receiving-tab">PISANG</button>
+          <button data-rfilter="LOKAL" class="btn tab-inactive receiving-tab">LOKAL</button>
+          <button data-rfilter="FMCG" class="btn tab-inactive receiving-tab">FMCG</button>
+          <button data-rfilter="IMPORT" class="btn tab-inactive receiving-tab">IMPORT</button>
         </div>
+      </div>
+      <div class="card-body">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="title" id="receiving-title">Unit PISANG</h2>
+          <div class="text-sm muted">Klik “PANGGIL” untuk pemanggilan bongkar / ambil surat jalan</div>
+        </div>
+        <div id="receiving-units" class="space-y-4">
+          <!-- Diisi via script.js -->
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CHECKER PAGE -->
+  <section id="checker-page" class="max-w-7xl mx-auto px-4 sm:px-6 py-6 hidden">
+    <!-- Filter Jenis Muatan -->
+    <div class="card mb-6">
+      <div class="card-head">
+        <div class="flex flex-wrap gap-2">
+          <button data-filter="ALL" class="btn tab-active checker-filter">SEMUA</button>
+          <button data-filter="PISANG" class="btn tab-inactive checker-filter">PISANG <span id="count-pisang" class="badge">0</span></button>
+          <button data-filter="LOKAL" class="btn tab-inactive checker-filter">LOKAL <span id="count-lokal" class="badge">0</span></button>
+          <button data-filter="FMCG" class="btn tab-inactive checker-filter">FMCG <span id="count-fmcg" class="badge">0</span></button>
+          <button data-filter="IMPORT" class="btn tab-inactive checker-filter">IMPORT <span id="count-import" class="badge">0</span></button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="flex gap-2">
+          <button data-tab="standby" id="tab-standby" class="btn btn-primary">Standby</button>
+          <button data-tab="proses"  id="tab-proses"  class="btn">Proses</button>
+          <button data-tab="selesai" id="tab-selesai" class="btn">Selesai</button>
+        </div>
+      </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="auth.js"></script>
-    <script src="script.js"></script>
-    <script>
-        // Protection middleware - DIPERBAIKI
-        document.addEventListener('DOMContentLoaded', function() {
-            // Inisialisasi tema
-            initializeTheme();
-            
-            if (auth.requireAuth()) {
-                auth.updateUserInfo();
-                
-                // Bind manual logout button untuk backup
-                const logoutBtn = document.getElementById('logoutBtn');
-                if (logoutBtn) {
-                    logoutBtn.addEventListener('click', function() {
-                        if (confirm('Yakin ingin logout?')) {
-                            auth.logout();
-                        }
-                    });
-                }
-                
-                // Initialize monitoring system setelah auth berhasil
-                try {
-                    new MonitoringSystem();
-                } catch (error) {
-                    console.error('Error initializing MonitoringSystem:', error);
-                    showError('Gagal memuat sistem monitoring: ' + error.message);
-                    // Force hide loading jika ada error
-                    const loadingElement = document.getElementById('loading');
-                    if (loadingElement) {
-                        loadingElement.style.display = 'none';
-                    }
-                }
-            }
-        });
+    <!-- Standby -->
+    <div id="standby-section" class="card mb-6">
+      <div class="card-head"><h3 class="title">Daftar Antrian Unit</h3></div>
+      <div class="card-body">
+        <div id="standby-queue" class="space-y-4"><!-- render --></div>
+      </div>
+    </div>
 
-        // Fungsi untuk mengelola tema gelap/terang
-        function initializeTheme() {
-            const themeToggle = document.getElementById('themeToggle');
-            const themeIcon = themeToggle.querySelector('i');
-            
-            // Cek preferensi tema yang disimpan
-            const savedTheme = localStorage.getItem('theme') || 'light';
-            document.body.setAttribute('data-theme', savedTheme);
-            
-            // Update ikon berdasarkan tema
-            updateThemeIcon(themeIcon, savedTheme);
-            
-            // Event listener untuk toggle tema
-            themeToggle.addEventListener('click', function() {
-                const currentTheme = document.body.getAttribute('data-theme');
-                const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-                
-                document.body.setAttribute('data-theme', newTheme);
-                localStorage.setItem('theme', newTheme);
-                
-                updateThemeIcon(themeIcon, newTheme);
-            });
-        }
-        
-        function updateThemeIcon(iconElement, theme) {
-            if (theme === 'dark') {
-                iconElement.classList.remove('fa-moon');
-                iconElement.classList.add('fa-sun');
-            } else {
-                iconElement.classList.remove('fa-sun');
-                iconElement.classList.add('fa-moon');
-            }
-        }
-        
-        // Fungsi untuk menampilkan pesan error
-        function showError(message) {
-            const errorElement = document.getElementById('errorMessage');
-            const errorText = document.getElementById('errorText');
-            
-            if (errorElement && errorText) {
-                errorText.textContent = message;
-                errorElement.style.display = 'block';
-                
-                // Sembunyikan error setelah 5 detik
-                setTimeout(() => {
-                    errorElement.style.display = 'none';
-                }, 5000);
-            }
-        }
-        
-        // Fungsi untuk menampilkan status "tidak ada data"
-        function showNoData() {
-            const noDataElement = document.getElementById('noData');
-            if (noDataElement) {
-                noDataElement.style.display = 'block';
-            }
-        }
-        
-        // Fungsi untuk menyembunyikan status "tidak ada data"
-        function hideNoData() {
-            const noDataElement = document.getElementById('noData');
-            if (noDataElement) {
-                noDataElement.style.display = 'none';
-            }
-        }
-    </script>
+    <!-- Proses -->
+    <div id="proses-section" class="card mb-6 hidden">
+      <div class="card-head"><h3 class="title">Unit Dalam Proses</h3></div>
+      <div class="card-body">
+        <div id="proses-queue" class="space-y-4"><!-- render --></div>
+      </div>
+    </div>
+
+    <!-- Selesai -->
+    <div id="selesai-section" class="card mb-6 hidden">
+      <div class="card-head"><h3 class="title">Unit Selesai Bongkar</h3></div>
+      <div class="card-body">
+        <div id="selesai-queue" class="space-y-4"><!-- render --></div>
+      </div>
+    </div>
+  </section>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/js/all.min.js" defer></script>
+  <script src="auth.js"></script>
+  <script src="script.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // Proteksi halaman
+      if (!auth.requireAuth()) return;
+      auth.updateUserInfo();
+      document.getElementById('logoutBtn')?.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (confirm('Yakin ingin logout?')) auth.logout();
+      });
+
+      // Init nav
+      const navReceiving = document.getElementById('nav-receiving');
+      const navChecker   = document.getElementById('nav-checker');
+      const receivingPage = document.getElementById('receiving-page');
+      const checkerPage   = document.getElementById('checker-page');
+
+      const switchToReceiving = () => {
+        receivingPage.classList.remove('hidden');
+        checkerPage.classList.add('hidden');
+        navReceiving.classList.add('btn-primary'); navReceiving.classList.remove('btn');
+        navChecker.classList.remove('btn-primary'); navChecker.classList.add('btn');
+      };
+      const switchToChecker = () => {
+        checkerPage.classList.remove('hidden');
+        receivingPage.classList.add('hidden');
+        navChecker.classList.add('btn-primary'); navChecker.classList.remove('btn');
+        navReceiving.classList.remove('btn-primary'); navReceiving.classList.add('btn');
+      };
+
+      navReceiving.addEventListener('click', switchToReceiving);
+      navChecker.addEventListener('click', switchToChecker);
+
+      // start at Receiving
+      switchToReceiving();
+
+      // Init sistem monitoring
+      window.ms = new MonitoringSystem();
+    });
+  </script>
 </body>
 </html>

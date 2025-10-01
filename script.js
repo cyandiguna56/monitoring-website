@@ -400,18 +400,17 @@ async function updateStatusOnServer({ sheet, no, which }) {
   fd.append('action', 'updateStatus');
   fd.append('sheet', sheet);
   fd.append('no_surat_jalan', no);
-  fd.append('which', which); // START | FINISH | CANCEL
-  const res = await fetch(SCRIPT_URL, { method: 'POST', body: fd });
-  if (!res.ok) alert('Gagal mengirim perintah. Coba lagi.');
-}
+  fd.append('which', which);
 
-async function uploadFileToDrive({ sheet, no, kind, file }) {
-  const fd = new FormData();
-  fd.append('action', 'uploadImage');
-  fd.append('sheet', sheet);
-  fd.append('no_surat_jalan', no);
-  fd.append('kind', kind); // SURAT_JALAN | FOTO_UNIT
-  fd.append('file', file, file.name);
-  const res = await fetch(SCRIPT_URL, { method: 'POST', body: fd });
-  if (!res.ok) alert('Upload gagal.');
+  try {
+    const res = await fetch(SCRIPT_URL, { method: 'POST', body: fd });
+    if (!res.ok) throw new Error('POST failed ' + res.status);
+    return await res.json();
+  } catch (err) {
+    // Fallback via GET (tanpa upload, aman)
+    const url = `${SCRIPT_URL}?action=updateStatus&sheet=${encodeURIComponent(sheet)}&no_surat_jalan=${encodeURIComponent(no)}&which=${encodeURIComponent(which)}`;
+    const res2 = await fetch(url);
+    if (!res2.ok) throw new Error('GET fallback failed ' + res2.status);
+    return await res2.json();
+  }
 }

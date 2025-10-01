@@ -2,167 +2,126 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8" />
-  <title>Receiving Checker System</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <!-- Tailwind CDN -->
+  <title>Receiving & Checker - Monitoring System</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    :root { color-scheme: light; }
-    /* Grayscale-only theme */
-    .btn {
-      @apply px-4 py-2 rounded-md border border-neutral-300 text-neutral-800 bg-white hover:bg-neutral-100 transition;
+    /* Skema warna hitam–putih minimal */
+    :root {
+      --ink: #111;         /* teks utama */
+      --ink-soft: #4b5563; /* teks sekunder */
+      --paper: #fff;       /* background */
+      --line: #e5e7eb;     /* garis pemisah */
     }
-    .btn-primary {
-      @apply bg-neutral-900 text-white border-neutral-900 hover:bg-black;
-    }
-    .badge {
-      @apply inline-block text-xs px-2 py-0.5 rounded-full border border-neutral-300 text-neutral-700 bg-neutral-100;
-    }
-    .card { @apply bg-white border border-neutral-200 rounded-xl shadow-sm; }
-    .card-head { @apply px-6 py-4 border-b border-neutral-200; }
-    .card-body { @apply p-6; }
-    .muted { @apply text-neutral-500; }
-    .title { @apply text-xl font-semibold text-neutral-900; }
-    .subtitle { @apply text-sm text-neutral-600; }
-    .tab-active { @apply bg-neutral-900 text-white; }
-    .tab-inactive { @apply bg-white text-neutral-700 border border-neutral-300; }
-    .hidden { display: none; }
+    body { color: var(--ink); background: var(--paper); }
+    .btn { @apply px-4 py-2 rounded border border-black text-black bg-white hover:bg-black hover:text-white transition; }
+    .btn-ghost { @apply px-4 py-2 rounded border border-transparent text-black hover:bg-gray-100 transition; }
+    .badge { @apply inline-flex items-center px-2 py-0.5 rounded text-xs border; }
+    .badge-standby { @apply border-gray-400 text-gray-700; }
+    .badge-proses { @apply border-black text-black; }
+    .badge-selesai { @apply border-gray-900 bg-gray-900 text-white; }
+    .card { @apply bg-white border border-[color:var(--line)] rounded-xl p-5 shadow-sm; }
+    .tab-active { @apply bg-black text-white; }
+    .tab { @apply flex-1 text-center py-3 rounded border border-[color:var(--line)] hover:bg-gray-100; }
   </style>
 </head>
-<body class="bg-neutral-50 min-h-screen">
+<body class="min-h-screen">
   <!-- Header -->
-  <header class="bg-white border-b border-neutral-200">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4">
-      <div class="flex items-center justify-between">
-        <div class="flex gap-2">
-          <button id="nav-receiving" class="btn btn-primary">Receiving</button>
-          <button id="nav-checker" class="btn">Checker</button>
-        </div>
-        <div class="text-right">
-          <h1 class="text-2xl font-bold text-neutral-900">Sistem Manajemen</h1>
-          <p class="subtitle">Antrian Unit</p>
-        </div>
-        <div class="flex items-center gap-3">
-          <div class="text-sm text-neutral-700">
-            <i class="fa-solid fa-user"></i>
-            <span id="currentUser">User</span>
-          </div>
-          <a href="#" class="btn" id="logoutBtn">Logout</a>
-        </div>
+  <header class="border-b border-[color:var(--line)]">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <div class="text-xl font-bold tracking-tight">Monitoring System</div>
+        <span class="text-sm text-[color:var(--ink-soft)]">/ Antrian Unit</span>
+      </div>
+      <div class="flex items-center gap-4">
+        <span class="text-sm">👤 <span id="currentUser">User</span></span>
+        <a href="#" class="btn-ghost logout-btn">Logout</a>
       </div>
     </div>
   </header>
 
-  <!-- RECEIVING PAGE -->
-  <section id="receiving-page" class="max-w-7xl mx-auto px-4 sm:px-6 py-6">
-    <div class="card mb-6">
-      <div class="card-head">
-        <div class="flex flex-wrap gap-2">
-          <button data-rfilter="PISANG" class="btn tab-active receiving-tab">PISANG</button>
-          <button data-rfilter="LOKAL" class="btn tab-inactive receiving-tab">LOKAL</button>
-          <button data-rfilter="FMCG" class="btn tab-inactive receiving-tab">FMCG</button>
-          <button data-rfilter="IMPORT" class="btn tab-inactive receiving-tab">IMPORT</button>
-        </div>
-      </div>
-      <div class="card-body">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="title" id="receiving-title">Unit PISANG</h2>
-          <div class="text-sm muted">Klik “PANGGIL” untuk pemanggilan bongkar / ambil surat jalan</div>
-        </div>
-        <div id="receiving-units" class="space-y-4">
-          <!-- Diisi via script.js -->
-        </div>
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Nav Mode -->
+    <div class="mb-6 flex gap-3">
+      <button id="nav-receiving" class="btn">Receiving</button>
+      <button id="nav-checker" class="btn-ghost">Checker</button>
+      <div class="ml-auto">
+        <button id="reloadBtn" class="btn">Reload Data</button>
       </div>
     </div>
-  </section>
 
-  <!-- CHECKER PAGE -->
-  <section id="checker-page" class="max-w-7xl mx-auto px-4 sm:px-6 py-6 hidden">
-    <!-- Filter Jenis Muatan -->
-    <div class="card mb-6">
-      <div class="card-head">
-        <div class="flex flex-wrap gap-2">
-          <button data-filter="ALL" class="btn tab-active checker-filter">SEMUA</button>
-          <button data-filter="PISANG" class="btn tab-inactive checker-filter">PISANG <span id="count-pisang" class="badge">0</span></button>
-          <button data-filter="LOKAL" class="btn tab-inactive checker-filter">LOKAL <span id="count-lokal" class="badge">0</span></button>
-          <button data-filter="FMCG" class="btn tab-inactive checker-filter">FMCG <span id="count-fmcg" class="badge">0</span></button>
-          <button data-filter="IMPORT" class="btn tab-inactive checker-filter">IMPORT <span id="count-import" class="badge">0</span></button>
-        </div>
-      </div>
-      <div class="card-body">
+    <!-- RECEIVING -->
+    <section id="receiving-page" class="hidden">
+      <!-- Filter Unit Type -->
+      <div class="card mb-6">
         <div class="flex gap-2">
-          <button data-tab="standby" id="tab-standby" class="btn btn-primary">Standby</button>
-          <button data-tab="proses"  id="tab-proses"  class="btn">Proses</button>
-          <button data-tab="selesai" id="tab-selesai" class="btn">Selesai</button>
+          <button data-rec="PISANG" class="tab tab-active">PISANG</button>
+          <button data-rec="LOKAL" class="tab">LOKAL</button>
+          <button data-rec="FMCG" class="tab">FMCG</button>
+          <button data-rec="IMPORT" class="tab">IMPORT</button>
         </div>
       </div>
-    </div>
 
-    <!-- Standby -->
-    <div id="standby-section" class="card mb-6">
-      <div class="card-head"><h3 class="title">Daftar Antrian Unit</h3></div>
-      <div class="card-body">
-        <div id="standby-queue" class="space-y-4"><!-- render --></div>
+      <div class="card">
+        <div class="flex items-center justify-between mb-4">
+          <h2 id="receiving-title" class="text-lg font-semibold tracking-tight">Unit PISANG</h2>
+          <div class="text-sm text-[color:var(--ink-soft)]">Klik “PANGGIL” / upload Surat Jalan</div>
+        </div>
+        <div id="receiving-units" class="space-y-4"></div>
+        <div id="receiving-empty" class="hidden text-center text-[color:var(--ink-soft)] py-10">Tidak ada data.</div>
       </div>
-    </div>
+    </section>
 
-    <!-- Proses -->
-    <div id="proses-section" class="card mb-6 hidden">
-      <div class="card-head"><h3 class="title">Unit Dalam Proses</h3></div>
-      <div class="card-body">
-        <div id="proses-queue" class="space-y-4"><!-- render --></div>
+    <!-- CHECKER -->
+    <section id="checker-page">
+      <!-- Filter Jenis Muatan -->
+      <div class="card mb-6">
+        <div class="flex flex-wrap items-center gap-2">
+          <button data-filter="ALL" class="tab tab-active">SEMUA</button>
+          <button data-filter="PISANG" class="tab">PISANG <span id="count-pisang" class="ml-1 badge badge-standby">0</span></button>
+          <button data-filter="LOKAL" class="tab">LOKAL <span id="count-lokal" class="ml-1 badge badge-standby">0</span></button>
+          <button data-filter="FMCG" class="tab">FMCG <span id="count-fmcg" class="ml-1 badge badge-standby">0</span></button>
+          <button data-filter="IMPORT" class="tab">IMPORT <span id="count-import" class="ml-1 badge badge-standby">0</span></button>
+        </div>
       </div>
-    </div>
 
-    <!-- Selesai -->
-    <div id="selesai-section" class="card mb-6 hidden">
-      <div class="card-head"><h3 class="title">Unit Selesai Bongkar</h3></div>
-      <div class="card-body">
-        <div id="selesai-queue" class="space-y-4"><!-- render --></div>
+      <!-- Tabs Status -->
+      <div class="card mb-6">
+        <div class="flex gap-2">
+          <button data-tab="standby" class="tab tab-active">Standby</button>
+          <button data-tab="proses" class="tab">Proses</button>
+          <button data-tab="selesai" class="tab">Selesai</button>
+        </div>
       </div>
-    </div>
-  </section>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/js/all.min.js" defer></script>
+      <!-- Lists -->
+      <div id="standby-section" class="space-y-4">
+        <div id="standby-queue" class="space-y-4"></div>
+        <div id="standby-empty" class="hidden text-center text-[color:var(--ink-soft)] py-10">Tidak ada unit dalam standby.</div>
+      </div>
+
+      <div id="proses-section" class="hidden space-y-4">
+        <div id="proses-queue" class="space-y-4"></div>
+        <div id="proses-empty" class="hidden text-center text-[color:var(--ink-soft)] py-10">Tidak ada unit dalam proses.</div>
+      </div>
+
+      <div id="selesai-section" class="hidden space-y-4">
+        <div id="selesai-queue" class="space-y-4"></div>
+        <div id="selesai-empty" class="hidden text-center text-[color:var(--ink-soft)] py-10">Belum ada unit selesai.</div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Scripts -->
   <script src="auth.js"></script>
   <script src="script.js"></script>
   <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      // Proteksi halaman
-      if (!auth.requireAuth()) return;
-      auth.updateUserInfo();
-      document.getElementById('logoutBtn')?.addEventListener('click', (e) => {
-        e.preventDefault();
-        if (confirm('Yakin ingin logout?')) auth.logout();
-      });
-
-      // Init nav
-      const navReceiving = document.getElementById('nav-receiving');
-      const navChecker   = document.getElementById('nav-checker');
-      const receivingPage = document.getElementById('receiving-page');
-      const checkerPage   = document.getElementById('checker-page');
-
-      const switchToReceiving = () => {
-        receivingPage.classList.remove('hidden');
-        checkerPage.classList.add('hidden');
-        navReceiving.classList.add('btn-primary'); navReceiving.classList.remove('btn');
-        navChecker.classList.remove('btn-primary'); navChecker.classList.add('btn');
-      };
-      const switchToChecker = () => {
-        checkerPage.classList.remove('hidden');
-        receivingPage.classList.add('hidden');
-        navChecker.classList.add('btn-primary'); navChecker.classList.remove('btn');
-        navReceiving.classList.remove('btn-primary'); navReceiving.classList.add('btn');
-      };
-
-      navReceiving.addEventListener('click', switchToReceiving);
-      navChecker.addEventListener('click', switchToChecker);
-
-      // start at Receiving
-      switchToReceiving();
-
-      // Init sistem monitoring
-      window.ms = new MonitoringSystem();
+    document.addEventListener("DOMContentLoaded", () => {
+      if (auth.requireAuth()) {
+        auth.updateUserInfo();
+        window.app = new MonitoringSystem(); // init app
+      }
     });
   </script>
 </body>

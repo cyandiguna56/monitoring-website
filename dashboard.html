@@ -15,19 +15,31 @@
       --line: #e5e7eb;     /* garis pemisah */
     }
     body { color: var(--ink); background: var(--paper); }
-    .btn { @apply px-4 py-2 rounded border border-black text-black bg-white hover:bg-black hover:text-white transition; }
-    .btn-ghost { @apply px-4 py-2 rounded border border-transparent text-black hover:bg-gray-100 transition; }
-    .badge { @apply inline-flex items-center px-2 py-0.5 rounded text-xs border; }
-    .badge-standby { @apply border-gray-400 text-gray-700; }
-    .badge-proses { @apply border-black text-black; }
-    .badge-selesai { @apply border-gray-900 bg-gray-900 text-white; }
-    .card { @apply bg-white border border-[color:var(--line)] rounded-xl p-5 shadow-sm; }
-    .tab-active { @apply bg-black text-white; }
-    .tab { @apply flex-1 text-center py-3 rounded border border-[color:var(--line)] hover:bg-gray-100; }
-    .btn, .btn-ghost, .tab { cursor: pointer; }
-    .btn:hover     { background: #111; color:#fff; }
-    .btn-ghost:hover { background: #f3f4f6; } /* abu-abu muda */
-    .tab:hover     { background: #f3f4f6; }
+    /* Tanpa @apply — CSS murni */
+    .btn{
+      padding:.5rem 1rem;border:1px solid #000;border-radius:.5rem;background:#fff;color:#000;
+      transition:background-color .2s,color .2s
+    }
+    .btn:hover{background:#000;color:#fff}
+    .btn-ghost{
+      padding:.5rem 1rem;border:1px solid transparent;border-radius:.5rem;background:transparent;color:#000;
+      transition:background-color .2s
+    }
+    .btn-ghost:hover{background:#f3f4f6}
+    .badge{
+      display:inline-flex;align-items:center;padding:.125rem .5rem;border-radius:.375rem;border:1px solid #000;font-size:.75rem
+    }
+    .badge-standby{border-color:#9ca3af;color:#374151}
+    .badge-proses{border-color:#000;color:#000}
+    .badge-selesai{background:#111;border-color:#111;color:#fff}
+    .card{background:#fff;border:1px solid var(--line);border-radius:.75rem;padding:1.25rem;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+    .tab{
+      flex:1;text-align:center;padding:.75rem;border:1px solid var(--line);border-radius:.5rem;
+      transition:background-color .2s
+    }
+    .tab:hover{background:#f3f4f6}
+    .tab-active{background:#000 !important;color:#fff !important}
+    .btn,.btn-ghost,.tab{cursor:pointer}
   </style>
 </head>
 <body class="min-h-screen">
@@ -48,8 +60,8 @@
   <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <!-- Nav Mode -->
     <div class="mb-6 flex gap-3">
-      <button id="nav-receiving" class="btn">Receiving</button>
-      <button id="nav-checker" class="btn-ghost">Checker</button>
+      <button id="nav-receiving" class="btn-ghost">Receiving</button>
+      <button id="nav-checker" class="btn">Checker</button>
       <div class="ml-auto">
         <button id="reloadBtn" class="btn">Reload Data</button>
       </div>

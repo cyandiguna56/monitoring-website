@@ -2,7 +2,7 @@
 // KONFIGURASI
 // =======================================
 // Arahkan ke URL Cloudflare Worker kamu (bukan langsung ke /exec GAS)
-const SCRIPT_URL = 'https://cors-proxy-apps-script.cyandiguna56.workers.dev/'; // <-- GANTI INI
+const SCRIPT_URL = 'https://cors-proxy-apps-script.cyandiguna56.workers.dev/'; // <-- pastikan ini benar
 
 // Daftar sheet sumber data
 const SHEETS = ['MONITORING PISANG', 'MONITORING LOKAL', 'MONITORING FMCG', 'MONITORING IMPORT'];
@@ -143,7 +143,7 @@ class MonitoringSystem{
   }
 
   async fetchSheet(sheetName){
-    // Semua GET juga lewat proxy Worker (CORS aman)
+    // Semua GET lewat proxy Worker (CORS aman)
     const url = `${SCRIPT_URL}?sheet=${encodeURIComponent(sheetName)}`;
     const ctrl = new AbortController();
     const to = setTimeout(()=>ctrl.abort(), 20000);
@@ -172,33 +172,33 @@ class MonitoringSystem{
       const st = statusFromRow(u);
       const badgeCls = st==='STANDBY' ? 'badge badge-standby' : (st==='PROSES' ? 'badge badge-proses' : 'badge badge-selesai');
       const sjPreview = u.SURAT_JALAN_URL
-        ? `<a href="${fmt(u.SURAT_JALAN_URL)}" target="_blank" class="text-sm underline">Lihat Surat Jalan</a>`
-        : `<span class="text-sm text-gray-500">Belum ada file</span>`;
+        ? `<a href="${fmt(u.SURAT_JALAN_URL)}" target="_blank" class="text-sm" style="text-decoration:underline">Lihat Surat Jalan</a>`
+        : `<span class="text-sm" style="color:#6b7280">Belum ada file</span>`;
 
       const card = el(`
         <div class="card">
-          <div class="flex items-start justify-between gap-4">
+          <div class="row justify-between gap-4">
             <div>
-              <div class="text-sm text-[color:var(--ink-soft)]">${u.__sheet}</div>
+              <div class="text-sm ink-soft">${u.__sheet}</div>
               <div class="text-lg font-semibold">${fmt(u.NO_SURAT_JALAN) || '-'}</div>
               <div class="text-sm">${fmt(u.NO_KENDARAAN) || '-'}</div>
-              <div class="mt-2">${sjPreview}</div>
+              <div class="text-sm" style="margin-top:.5rem">${sjPreview}</div>
             </div>
-            <div class="text-right">
+            <div class="col" style="align-items:flex-end; position:relative">
               <div class="${badgeCls}">${st}</div>
-              <div class="mt-3 relative">
-                <button class="btn-ghost" data-call="${fmt(u.NO_SURAT_JALAN)}">PANGGIL ▾</button>
-                <div class="hidden absolute right-0 mt-2 w-44 bg-white border border-[color:var(--line)] rounded shadow z-10">
-                  <button class="w-full text-left px-3 py-2 hover:bg-gray-100" data-call-action="BONGKAR" data-call-id="${fmt(u.NO_SURAT_JALAN)}">🚛 BONGKAR</button>
-                  <button class="w-full text-left px-3 py-2 hover:bg-gray-100" data-call-action="AMBIL SURAT JALAN" data-call-id="${fmt(u.NO_SURAT_JALAN)}">📄 AMBIL SURAT JALAN</button>
+              <div style="margin-top:.75rem; position:relative">
+                <button class="btn-ghost" data-call="${fmt(u.NO_SURAT_JALAN)}" aria-haspopup="true" aria-expanded="false">PANGGIL ▾</button>
+                <div class="menu hidden" style="position:absolute; right:0; margin-top:.5rem; width:176px; background:#fff; border:1px solid var(--line); border-radius:.5rem; box-shadow:0 4px 12px rgba(0,0,0,.08); z-index:10;">
+                  <button class="btn-ghost" style="display:block; width:100%; text-align:left" data-call-action="BONGKAR" data-call-id="${fmt(u.NO_SURAT_JALAN)}">🚛 BONGKAR</button>
+                  <button class="btn-ghost" style="display:block; width:100%; text-align:left" data-call-action="AMBIL SURAT JALAN" data-call-id="${fmt(u.NO_SURAT_JALAN)}">📄 AMBIL SURAT JALAN</button>
                 </div>
               </div>
             </div>
           </div>
 
-          <div class="mt-4 border-t border-[color:var(--line)] pt-4">
-            <div class="text-sm font-medium mb-2">Upload Surat Jalan (jpg/png/pdf)</div>
-            <div class="flex items-center gap-3 flex-wrap">
+          <div style="margin-top:1rem; border-top:1px solid var(--line); padding-top:1rem">
+            <div class="text-sm font-medium" style="margin-bottom:.5rem">Upload Surat Jalan (jpg/png/pdf)</div>
+            <div class="row gap-3" style="flex-wrap:wrap">
               <input type="file" accept=".jpg,.jpeg,.png,.pdf" class="file-input" data-sj="${fmt(u.NO_SURAT_JALAN)}" />
               <button class="btn" data-upload-sj="${fmt(u.NO_SURAT_JALAN)}" data-sheet="${u.__sheet}">Upload</button>
             </div>
@@ -211,8 +211,10 @@ class MonitoringSystem{
     // toggle menu panggil
     container.querySelectorAll('[data-call]').forEach(btn=>{
       btn.addEventListener('click', (e)=>{
-        const menu = e.currentTarget.parentElement.querySelector('div.absolute');
-        document.querySelectorAll('#receiving-units div.absolute').forEach(m=>m.classList.add('hidden'));
+        const menu = e.currentTarget.parentElement.querySelector('.menu');
+        container.querySelectorAll('.menu').forEach(m=>{ if(m!==menu) m.classList.add('hidden'); });
+        const expanded = btn.getAttribute('aria-expanded') === 'true';
+        btn.setAttribute('aria-expanded', String(!expanded));
         menu.classList.toggle('hidden');
       });
     });
@@ -222,7 +224,7 @@ class MonitoringSystem{
         const id = e.currentTarget.dataset.callId;
         const action = e.currentTarget.dataset.callAction;
         alert(`🔊 PANGGILAN: ${id} - ${action}`);
-        document.querySelectorAll('#receiving-units div.absolute').forEach(m=>m.classList.add('hidden'));
+        container.querySelectorAll('.menu').forEach(m=>m.classList.add('hidden'));
       });
     });
     // upload SJ
@@ -241,8 +243,8 @@ class MonitoringSystem{
 
     // close menu saat klik di luar
     document.addEventListener('click', (ev)=>{
-      if(!ev.target.closest('[data-call]') && !ev.target.closest('div.absolute')){
-        document.querySelectorAll('#receiving-units div.absolute').forEach(m=>m.classList.add('hidden'));
+      if(!ev.target.closest('[data-call]') && !ev.target.closest('.menu')){
+        container.querySelectorAll('.menu').forEach(m=>m.classList.add('hidden'));
       }
     }, { once:true });
   }
@@ -266,38 +268,40 @@ class MonitoringSystem{
     const buckets = { STANDBY:[], PROSES:[], SELESAI:[] };
     list.forEach(u => buckets[statusFromRow(u)].push(u));
 
+    const mono = "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace";
+
     const makeCard = (u)=>{
       const st = statusFromRow(u);
       const badgeCls = st==='STANDBY' ? 'badge badge-standby' : (st==='PROSES' ? 'badge badge-proses' : 'badge badge-selesai');
       const fotoPreview = u.FOTO_UNIT_URL
-        ? `<a href="${fmt(u.FOTO_UNIT_URL)}" target="_blank" class="text-sm underline">Lihat Foto</a>`
-        : `<span class="text-sm text-gray-500">Belum ada foto</span>`;
+        ? `<a href="${fmt(u.FOTO_UNIT_URL)}" target="_blank" class="text-sm" style="text-decoration:underline">Lihat Foto</a>`
+        : `<span class="text-sm" style="color:#6b7280">Belum ada foto</span>`;
       const showStart  = fmt(u.START)  || '-';
       const showFinish = fmt(u.FINISH) || '-';
 
       return el(`
         <div class="card">
-          <div class="flex items-start justify-between gap-4">
+          <div class="row justify-between gap-4">
             <div>
-              <div class="text-sm text-[color:var(--ink-soft)]">${u.__sheet}</div>
+              <div class="text-sm ink-soft">${u.__sheet}</div>
               <div class="text-lg font-semibold">${fmt(u.NO_SURAT_JALAN)||'-'}</div>
               <div class="text-sm">${fmt(u.NO_KENDARAAN)||'-'}</div>
-              <div class="mt-1 text-sm text-[color:var(--ink-soft)]">Tgl Kedatangan: ${fmt(u.TANGGAL_KEDATANGAN)||'-'}</div>
-              <div class="mt-1 text-sm">Start: <span class="font-mono">${showStart}</span> · Finish: <span class="font-mono">${showFinish}</span></div>
-              <div class="mt-2">${fotoPreview}</div>
+              <div class="text-sm ink-soft" style="margin-top:.25rem">Tgl Kedatangan: ${fmt(u.TANGGAL_KEDATANGAN)||'-'}</div>
+              <div class="text-sm" style="margin-top:.25rem">Start: <span style="font-family:${mono}">${showStart}</span> · Finish: <span style="font-family:${mono}">${showFinish}</span></div>
+              <div class="text-sm" style="margin-top:.5rem">${fotoPreview}</div>
             </div>
-            <div class="text-right">
+            <div class="col" style="align-items:flex-end">
               <div class="${badgeCls}">${st}</div>
-              <div class="mt-3 flex gap-2">
+              <div class="row gap-2" style="margin-top:.75rem">
                 ${st==='STANDBY' ? `<button class="btn" data-start="${fmt(u.NO_SURAT_JALAN)}" data-sheet="${u.__sheet}">START</button>` : ''}
                 ${st==='PROSES'  ? `<button class="btn" data-finish="${fmt(u.NO_SURAT_JALAN)}" data-sheet="${u.__sheet}">FINISH</button>
                                     <button class="btn-ghost" data-cancel="${fmt(u.NO_SURAT_JALAN)}" data-sheet="${u.__sheet}">CANCEL</button>` : ''}
               </div>
             </div>
           </div>
-          <div class="mt-4 border-t border-[color:var(--line)] pt-4">
-            <div class="text-sm font-medium mb-2">Upload Foto Unit (jpg/png)</div>
-            <div class="flex items-center gap-3 flex-wrap">
+          <div style="margin-top:1rem; border-top:1px solid var(--line); padding-top:1rem">
+            <div class="text-sm font-medium" style="margin-bottom:.5rem">Upload Foto Unit (jpg/png)</div>
+            <div class="row gap-3" style="flex-wrap:wrap">
               <input type="file" accept=".jpg,.jpeg,.png" class="file-input" data-foto="${fmt(u.NO_SURAT_JALAN)}" />
               <button class="btn" data-upload-foto="${fmt(u.NO_SURAT_JALAN)}" data-sheet="${u.__sheet}">Upload</button>
             </div>

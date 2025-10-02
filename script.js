@@ -150,7 +150,9 @@ class MonitoringSystem{
     const res = await fetch(url, { signal: ctrl.signal });
     clearTimeout(to);
     if(!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
+    // Bisa jadi balikan bukan JSON valid → amankan
+    const text = await res.text();
+    try { return JSON.parse(text); } catch { throw new Error('Respon bukan JSON'); }
   }
 
   // =========================
@@ -390,8 +392,25 @@ async function updateStatusOnServer({ sheet, no, which }){
   fd.append('no_surat_jalan',no);
   fd.append('which',which);
 
-  const res = await fetch(SCRIPT_URL, { method:'POST', body:fd });
-  if (!res.ok) throw new Error('Request gagal '+res.status);
+  // 1) Coba POST via Worker
+  try {
+    const res = await fetch(SCRIPT_URL, { method:'POST', body:fd });
+    const text = await res.text();
+    let data = {};
+    try { data = JSON.parse(text); } catch {}
+    if (!res.ok || data.error) throw new Error(data.message || ('POST gagal '+res.status));
+    return data;
+  } catch (err) {
+    console.warn('POST updateStatus gagal, fallback GET:', err.message);
+    // 2) Fallback GET (Apps Script doGet => action=updateStatus)
+    const url = `${SCRIPT_URL}?action=updateStatus&sheet=${encodeURIComponent(sheet)}&no_surat_jalan=${encodeURIComponent(no)}&which=${encodeURIComponent(which)}`;
+    const r2 = await fetch(url);
+    const t2 = await r2.text();
+    let d2 = {};
+    try { d2 = JSON.parse(t2); } catch {}
+    if (!r2.ok || d2.error) throw new Error(d2.message || ('GET fallback gagal '+r2.status));
+    return d2;
+  }
 }
 
 async function uploadFileToDrive({ sheet, no, kind, file }){
@@ -403,5 +422,12 @@ async function uploadFileToDrive({ sheet, no, kind, file }){
   fd.append('file',file,file.name);
 
   const res = await fetch(SCRIPT_URL, { method:'POST', body:fd });
-  if (!res.ok) throw new Error('Upload gagal '+res.status);
+  const text = await res.text();
+  let data = {};
+  try { data = JSON.parse(text); } catch {}
+  if (!res.ok || data.error) {
+    console.error('Upload gagal:', text);
+    throw new Error(data.message || ('Upload gagal '+res.status));
+  }
+  return data;
 }

@@ -1,7 +1,10 @@
 // =======================================
 // KONFIGURASI
 // =======================================
-const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzOHv6wLb9QzXaDtc0eKy1xYP1ojg5-GXzwsLmXxfLV0eGQH_MSTnpaazkVsrmKIXLy5w/exec';
+// Arahkan ke URL Cloudflare Worker kamu (bukan langsung ke /exec GAS)
+const SCRIPT_URL = 'https://cors-proxy-apps-script.cyandiguna56.workers.dev/'; // <-- GANTI INI
+
+// Daftar sheet sumber data
 const SHEETS = ['MONITORING PISANG', 'MONITORING LOKAL', 'MONITORING FMCG', 'MONITORING IMPORT'];
 
 // =======================================
@@ -36,6 +39,8 @@ function el(html){
   t.innerHTML = html.trim();
   return t.content.firstElementChild;
 }
+
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 // =======================================
 // APP STATE
@@ -138,20 +143,14 @@ class MonitoringSystem{
   }
 
   async fetchSheet(sheetName){
+    // Semua GET juga lewat proxy Worker (CORS aman)
     const url = `${SCRIPT_URL}?sheet=${encodeURIComponent(sheetName)}`;
-    try{
-      const ctrl = new AbortController();
-      const to = setTimeout(()=>ctrl.abort(), 20000);
-      const res = await fetch(url, { signal: ctrl.signal });
-      clearTimeout(to);
-      if(!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    }catch(err){
-      const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-      const res2 = await fetch(proxy);
-      if(!res2.ok) throw new Error(`Proxy HTTP ${res2.status}`);
-      return await res2.json();
-    }
+    const ctrl = new AbortController();
+    const to = setTimeout(()=>ctrl.abort(), 20000);
+    const res = await fetch(url, { signal: ctrl.signal });
+    clearTimeout(to);
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
   }
 
   // =========================
@@ -235,6 +234,7 @@ class MonitoringSystem{
         const file  = input?.files?.[0];
         if(!file) return alert('Pilih file terlebih dahulu.');
         await uploadFileToDrive({ sheet, no, kind:'SURAT_JALAN', file });
+        await sleep(700);
         await app.loadAllData();
       });
     });
@@ -314,29 +314,34 @@ class MonitoringSystem{
     emptyProses .classList.toggle('hidden', buckets.PROSES.length>0);
     emptySelesai.classList.toggle('hidden', buckets.SELESAI.length>0);
 
-    // Bind actions
+    // START
     qStandby.querySelectorAll('[data-start]').forEach(btn=>{
       btn.addEventListener('click', async (e)=>{
         const no = e.currentTarget.dataset.start;
         const sheet = e.currentTarget.dataset.sheet;
         await updateStatusOnServer({ sheet, no, which:'START' });
+        await sleep(700);
         await app.loadAllData();
       });
     });
+    // FINISH
     qProses.querySelectorAll('[data-finish]').forEach(btn=>{
       btn.addEventListener('click', async (e)=>{
         const no = e.currentTarget.dataset.finish;
         const sheet = e.currentTarget.dataset.sheet;
         await updateStatusOnServer({ sheet, no, which:'FINISH' });
+        await sleep(700);
         await app.loadAllData();
       });
     });
+    // CANCEL
     qProses.querySelectorAll('[data-cancel]').forEach(btn=>{
       btn.addEventListener('click', async (e)=>{
         const no = e.currentTarget.dataset.cancel;
         const sheet = e.currentTarget.dataset.sheet;
         if(!confirm('Batalkan START untuk kembali ke STANDBY?')) return;
         await updateStatusOnServer({ sheet, no, which:'CANCEL' });
+        await sleep(700);
         await app.loadAllData();
       });
     });
@@ -351,6 +356,7 @@ class MonitoringSystem{
           const file  = input?.files?.[0];
           if(!file) return alert('Pilih foto terlebih dahulu.');
           await uploadFileToDrive({ sheet, no, kind:'FOTO_UNIT', file });
+          await sleep(900);
           await app.loadAllData();
         });
       });
@@ -371,7 +377,7 @@ class MonitoringSystem{
 }
 
 // =======================================
-// SERVER CALLS
+// SERVER CALLS (via Worker — CORS aman)
 // =======================================
 async function updateStatusOnServer({ sheet, no, which }){
   const fd = new FormData();
@@ -379,16 +385,9 @@ async function updateStatusOnServer({ sheet, no, which }){
   fd.append('sheet',sheet);
   fd.append('no_surat_jalan',no);
   fd.append('which',which);
-  try{
-    const res = await fetch(SCRIPT_URL, { method:'POST', body:fd });
-    if (!res.ok) throw new Error('POST failed '+res.status);
-    // tidak perlu baca body
-  }catch(err){
-    // OPTIONAL fallback GET — aktifkan hanya jika doGet Anda menangani ?action=updateStatus
-    // const url = `${SCRIPT_URL}?action=updateStatus&sheet=${encodeURIComponent(sheet)}&no_surat_jalan=${encodeURIComponent(no)}&which=${encodeURIComponent(which)}`;
-    // await fetch(url);
-    throw err;
-  }
+
+  const res = await fetch(SCRIPT_URL, { method:'POST', body:fd });
+  if (!res.ok) throw new Error('Request gagal '+res.status);
 }
 
 async function uploadFileToDrive({ sheet, no, kind, file }){
@@ -398,6 +397,7 @@ async function uploadFileToDrive({ sheet, no, kind, file }){
   fd.append('no_surat_jalan',no);
   fd.append('kind',kind); // SURAT_JALAN | FOTO_UNIT
   fd.append('file',file,file.name);
+
   const res = await fetch(SCRIPT_URL, { method:'POST', body:fd });
-  if(!res.ok) throw new Error('Upload gagal: '+res.status);
+  if (!res.ok) throw new Error('Upload gagal '+res.status);
 }

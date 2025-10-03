@@ -1,19 +1,26 @@
 // =======================================
 // KONFIGURASI
 // =======================================
-// Arahkan ke URL Cloudflare Worker kamu (bukan langsung ke /exec GAS).
-// Worker ini meneruskan request ke GAS dan menambahkan header CORS.
-const SCRIPT_URL = 'https://cors-proxy-apps-script.cyandiguna56.workers.dev/';
-const GAS_DIRECT_URL = 'https://script.google.com/macros/s/AKfycbzYdYDoXyovrX2p13_Oph1uhLaJLlgYvN3C-mfOPtAcnZhc8jLEQigPVlZwbalIr-NWfg/exec';
+// Semua GET/POST ringan lewat Cloudflare Worker (menambah header CORS)
+const SCRIPT_URL =
+  'https://cors-proxy-apps-script.cyandiguna56.workers.dev/';
 
+// Khusus upload file, kirim LANGSUNG ke Apps Script (tanpa Worker) via form+iframe
+const GAS_DIRECT_URL =
+  'https://script.google.com/macros/s/AKfycbzYdYDoXyovrX2p13_Oph1uhLaJLlgYvN3C-mfOPtAcnZhc8jLEQigPVlZwbalIr-NWfg/exec';
 
 // Daftar sheet sumber data
-const SHEETS = ['MONITORING PISANG', 'MONITORING LOKAL', 'MONITORING FMCG', 'MONITORING IMPORT'];
+const SHEETS = [
+  'MONITORING PISANG',
+  'MONITORING LOKAL',
+  'MONITORING FMCG',
+  'MONITORING IMPORT'
+];
 
 // =======================================
 // UTIL
 // =======================================
-const fmt = (v) => (v == null ? '' : String(v));
+const fmt = v => (v == null ? '' : String(v));
 
 function normalizeType(u) {
   const t = (fmt(u.JENIS_MUATAN)).toUpperCase();
@@ -43,7 +50,7 @@ function el(html) {
   return t.content.firstElementChild;
 }
 
-const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // =======================================
 // APP STATE
@@ -173,7 +180,8 @@ class MonitoringSystem {
 
     filtered.forEach(u => {
       const st = statusFromRow(u);
-      const badgeCls = st === 'STANDBY' ? 'badge badge-standby' : (st === 'PROSES' ? 'badge badge-proses' : 'badge badge-selesai');
+      const badgeCls = st === 'STANDBY' ? 'badge badge-standby'
+                          : (st === 'PROSES' ? 'badge badge-proses' : 'badge badge-selesai');
       const sjPreview = u.SURAT_JALAN_URL
         ? `<a href="${fmt(u.SURAT_JALAN_URL)}" target="_blank" class="text-sm" style="text-decoration:underline">Lihat Surat Jalan</a>`
         : `<span class="text-sm" style="color:#6b7280">Belum ada file</span>`;
@@ -221,6 +229,7 @@ class MonitoringSystem {
         menu.classList.toggle('hidden');
       });
     });
+
     // aksi panggil
     container.querySelectorAll('[data-call-action]').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -230,6 +239,7 @@ class MonitoringSystem {
         container.querySelectorAll('.menu').forEach(m => m.classList.add('hidden'));
       });
     });
+
     // upload SJ
     container.querySelectorAll('[data-upload-sj]').forEach(btn => {
       btn.addEventListener('click', async (e) => {
@@ -238,7 +248,7 @@ class MonitoringSystem {
         const input = container.querySelector(`input[data-sj="${CSS.escape(no)}"]`);
         const file  = input?.files?.[0];
         if (!file) return alert('Pilih file terlebih dahulu.');
-        await uploadFileToDrive({ sheet, no, kind: 'SURAT_JALAN', file, inputEl: input });   // <--- kirim elemen input });
+        await uploadFileToDrive({ sheet, no, kind: 'SURAT_JALAN', file, inputEl: input });
         await sleep(700);
         await app.loadAllData();
       });
@@ -275,7 +285,8 @@ class MonitoringSystem {
 
     const makeCard = (u) => {
       const st = statusFromRow(u);
-      const badgeCls = st === 'STANDBY' ? 'badge badge-standby' : (st === 'PROSES' ? 'badge badge-proses' : 'badge badge-selesai');
+      const badgeCls = st === 'STANDBY' ? 'badge badge-standby'
+                        : (st === 'PROSES' ? 'badge badge-proses' : 'badge badge-selesai');
       const fotoPreview = u.FOTO_UNIT_URL
         ? `<a href="${fmt(u.FOTO_UNIT_URL)}" target="_blank" class="text-sm" style="text-decoration:underline">Lihat Foto</a>`
         : `<span class="text-sm" style="color:#6b7280">Belum ada foto</span>`;
@@ -362,7 +373,7 @@ class MonitoringSystem {
           const input = scope.querySelector(`input[data-foto="${CSS.escape(no)}"]`);
           const file  = input?.files?.[0];
           if (!file) return alert('Pilih foto terlebih dahulu.');
-          await uploadFileToDrive({ sheet, no, kind: 'FOTO_UNIT', file, inputEl: input });   // <--- kirim elemen input});
+          await uploadFileToDrive({ sheet, no, kind: 'FOTO_UNIT', file, inputEl: input });
           await sleep(800);
           await app.loadAllData();
         });
@@ -391,17 +402,10 @@ async function updateStatusOnServer({ sheet, no, which }) {
   const getUrl = `${SCRIPT_URL}?action=updateStatus&sheet=${encodeURIComponent(sheet)}&no_surat_jalan=${encodeURIComponent(no)}&which=${encodeURIComponent(which)}`;
   try {
     const r = await fetch(getUrl, { method: 'GET' });
-    if (r.ok) {
-      // optional: cek payload
-      // const j = await r.json();
-      return;
-    }
-    // jika GET gagal, lanjut coba POST
-  } catch (_) {
-    // lanjut ke POST
-  }
+    if (r.ok) return;
+  } catch (_) { /* lanjut ke POST */ }
 
-  // 2) Coba POST (kalau Worker/GAS sudah siap menerima doPost)
+  // 2) Coba POST (kalau Worker/GAS siap menangani doPost)
   const fd = new FormData();
   fd.append('action', 'updateStatus');
   fd.append('sheet', sheet);
@@ -422,7 +426,7 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
     return;
   }
 
-  // --- Upload langsung ke GAS via form+iframe (tanpa Worker, anti-CORS) ---
+  // Upload langsung ke GAS via form+iframe (tanpa CORS problem)
   await new Promise((resolve) => {
     const iframeName = `uploadFrame_${Date.now()}`;
     const iframe = document.createElement('iframe');
@@ -430,46 +434,42 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
     iframe.style.display = 'none';
 
     const form = document.createElement('form');
-    form.action = GAS_DIRECT_URL;       // <- URL /exec terbaru yang aktif
+    form.action = GAS_DIRECT_URL;  // /exec aktif
     form.method = 'POST';
     form.enctype = 'multipart/form-data';
     form.target = iframeName;
     form.style.display = 'none';
 
     // Hidden fields
-    const h = (name, value) => {
+    const addHidden = (name, value) => {
       const i = document.createElement('input');
-      i.type = 'hidden'; i.name = name; i.value = value; 
+      i.type = 'hidden'; i.name = name; i.value = value;
       form.appendChild(i);
     };
-    h('action', 'uploadImage');
-    h('sheet', sheet);
-    h('no_surat_jalan', no);
-    h('kind', kind); // SURAT_JALAN | FOTO_UNIT
+    addHidden('action', 'uploadImage'); // doPost handler
+    addHidden('sheet', sheet);
+    addHidden('no_surat_jalan', no);
+    addHidden('kind', kind); // SURAT_JALAN | FOTO_UNIT
 
-    // PENTING: pindahkan input file asli ke form agar file terkirim
+    // Pindahkan input file asli ke dalam form agar file terkirim
     const originalParent = inputEl.parentElement;
     const placeholder = document.createElement('span');
     originalParent.replaceChild(placeholder, inputEl);
     form.appendChild(inputEl);
 
-    // Selesai load (apapun statusnya), kembalikan input & resolve
+    // Setelah load (respon dari GAS), bersihkan dan ganti input baru (kosong)
     iframe.addEventListener('load', () => {
-      // Bersihkan elemen sementara
       document.body.removeChild(iframe);
       document.body.removeChild(form);
 
-      // Buat input baru kosong untuk upload berikutnya
       const newInput = document.createElement('input');
       newInput.type = 'file';
       newInput.className = 'file-input';
       newInput.accept = inputEl.accept || '.jpg,.jpeg,.png,.pdf';
-      // Salin data-attribute agar tombol "Upload" masih menemukan input
       if (inputEl.dataset.sj)   newInput.dataset.sj   = inputEl.dataset.sj;
       if (inputEl.dataset.foto) newInput.dataset.foto = inputEl.dataset.foto;
 
       placeholder.replaceWith(newInput);
-
       resolve();
     });
 
@@ -478,7 +478,6 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
     form.submit();
   });
 }
-
 
 // Expose class (dipanggil dari dashboard.html setelah auth)
 window.MonitoringSystem = MonitoringSystem;

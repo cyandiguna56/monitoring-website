@@ -4,6 +4,8 @@
 // Arahkan ke URL Cloudflare Worker kamu (bukan langsung ke /exec GAS).
 // Worker ini meneruskan request ke GAS dan menambahkan header CORS.
 const SCRIPT_URL = 'https://cors-proxy-apps-script.cyandiguna56.workers.dev/';
+const GAS_DIRECT_URL = 'https://script.google.com/macros/s/AKfycbzYdYDoXyovrX2p13_Oph1uhLaJLlgYvN3C-mfOPtAcnZhc8jLEQigPVlZwbalIr-NWfg/exec';
+
 
 // Daftar sheet sumber data
 const SHEETS = ['MONITORING PISANG', 'MONITORING LOKAL', 'MONITORING FMCG', 'MONITORING IMPORT'];
@@ -236,7 +238,7 @@ class MonitoringSystem {
         const input = container.querySelector(`input[data-sj="${CSS.escape(no)}"]`);
         const file  = input?.files?.[0];
         if (!file) return alert('Pilih file terlebih dahulu.');
-        await uploadFileToDrive({ sheet, no, kind: 'SURAT_JALAN', file });
+        await uploadFileToDrive({ sheet, no, kind: 'SURAT_JALAN', file, inputEl: input });   // <--- kirim elemen input });
         await sleep(700);
         await app.loadAllData();
       });
@@ -360,7 +362,7 @@ class MonitoringSystem {
           const input = scope.querySelector(`input[data-foto="${CSS.escape(no)}"]`);
           const file  = input?.files?.[0];
           if (!file) return alert('Pilih foto terlebih dahulu.');
-          await uploadFileToDrive({ sheet, no, kind: 'FOTO_UNIT', file });
+          await uploadFileToDrive({ sheet, no, kind: 'FOTO_UNIT', file, inputEl: input });   // <--- kirim elemen input});
           await sleep(800);
           await app.loadAllData();
         });
@@ -413,20 +415,88 @@ async function updateStatusOnServer({ sheet, no, which }) {
   }
 }
 
-async function uploadFileToDrive({ sheet, no, kind, file }) {
-  const fd = new FormData();
-  fd.append('action', 'uploadImage');
-  fd.append('sheet', sheet);
-  fd.append('no_surat_jalan', no);
-  fd.append('kind', kind); // SURAT_JALAN | FOTO_UNIT
-  fd.append('file', file, file.name);
+async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
+  // 1) Coba POST lewat Worker (CORS aman)
+    try {
+    const fd = new FormData();
+    fd.append('action', 'uploadImage');
+    fd.append('sheet', sheet);
+    fd.append('no_surat_jalan', no);
+    fd.append('kind', kind); // SURAT_JALAN | FOTO_UNIT
+    fd.append('file', file, file.name);
 
-  const res = await fetch(SCRIPT_URL, { method: 'POST', body: fd });
-  if (!res.ok) {
-    console.error('Upload gagal, status:', res.status);
-    alert('Upload gagal. Coba lagi.');
+    const res = await fetch(SCRIPT_URL, { method: 'POST', body: fd });
+    if (res.ok) return; // selesai
+    console.warn('Upload gagal, status:', res.status);
+    // jatuh ke fallback
+  } catch (e) {
+    console.warn('Upload via Worker error:', e);
+    // jatuh ke fallback
   }
+
+  // 2) Fallback: POST langsung ke GAS via <form target=iframe> (bypass CORS, doPost pasti jalan)
+    if (!inputEl || !(inputEl instanceof HTMLInputElement)) {
+    alert('Upload gagal. Silakan pilih ulang file dan coba lagi.');
+    return;
+  }
+
+    await new Promise((resolve) => {
+    const iframeName = `uploadFrame_${Date.now()}`;
+    const iframe = document.createElement('iframe');
+    iframe.name = iframeName;
+    iframe.style.display = 'none';
+
+    const form = document.createElement('form');
+    form.action = GAS_DIRECT_URL;            // langsung ke GAS /exec
+    form.method = 'POST';
+    form.enctype = 'multipart/form-data';
+    form.target = iframeName;
+    form.style.display = 'none';
+
+    // hidden fields
+    const hAction = document.createElement('input');
+    hAction.type = 'hidden'; hAction.name = 'action'; hAction.value = 'uploadImage';
+    const hSheet = document.createElement('input');
+    hSheet.type = 'hidden'; hSheet.name = 'sheet'; hSheet.value = sheet;
+    const hNo = document.createElement('input');
+    hNo.type = 'hidden'; hNo.name = 'no_surat_jalan'; hNo.value = no;
+    const hKind = document.createElement('input');
+    hKind.type = 'hidden'; hKind.name = 'kind'; hKind.value = kind;
+
+    form.appendChild(hAction);
+    form.appendChild(hSheet);
+    form.appendChild(hNo);
+    form.appendChild(hKind);
+
+    // PENTING: pindahkan input file yang dipakai user ke dalam form,
+    // agar Browser mengirimkan file aslinya.
+    const originalParent = inputEl.parentElement;
+    const placeholder = document.createElement('span'); // penanda posisi
+    originalParent.replaceChild(placeholder, inputEl);
+    form.appendChild(inputEl);
+
+    // selesai submit → kembalikan input ke UI (sebagai input baru yang kosong)
+    iframe.addEventListener('load', () => {
+      // bersihkan
+      document.body.removeChild(iframe);
+      document.body.removeChild(form);
+
+      // buat input baru agar user bisa upload lagi berikutnya
+      const newInput = document.createElement('input');
+      newInput.type = 'file';
+      newInput.className = 'file-input';
+      newInput.accept = inputEl.accept || '.jpg,.jpeg,.png,.pdf';
+      // pasang di tempat semula
+      placeholder.replaceWith(newInput);
+      resolve();
+    });
+
+      document.body.appendChild(iframe);
+      document.body.appendChild(form);
+      form.submit();
+  });
 }
+
 
 // Expose class (dipanggil dari dashboard.html setelah auth)
 window.MonitoringSystem = MonitoringSystem;

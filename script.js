@@ -416,84 +416,66 @@ async function updateStatusOnServer({ sheet, no, which }) {
 }
 
 async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
-  // 1) Coba POST lewat Worker (CORS aman)
-    try {
-    const fd = new FormData();
-    fd.append('action', 'uploadImage');
-    fd.append('sheet', sheet);
-    fd.append('no_surat_jalan', no);
-    fd.append('kind', kind); // SURAT_JALAN | FOTO_UNIT
-    fd.append('file', file, file.name);
-
-    const res = await fetch(SCRIPT_URL, { method: 'POST', body: fd });
-    if (res.ok) return; // selesai
-    console.warn('Upload gagal, status:', res.status);
-    // jatuh ke fallback
-  } catch (e) {
-    console.warn('Upload via Worker error:', e);
-    // jatuh ke fallback
-  }
-
-  // 2) Fallback: POST langsung ke GAS via <form target=iframe> (bypass CORS, doPost pasti jalan)
-    if (!inputEl || !(inputEl instanceof HTMLInputElement)) {
-    alert('Upload gagal. Silakan pilih ulang file dan coba lagi.');
+  // Validasi dasar
+  if (!file || !inputEl || !(inputEl instanceof HTMLInputElement)) {
+    alert('Pilih file terlebih dahulu.');
     return;
   }
 
-    await new Promise((resolve) => {
+  // --- Upload langsung ke GAS via form+iframe (tanpa Worker, anti-CORS) ---
+  await new Promise((resolve) => {
     const iframeName = `uploadFrame_${Date.now()}`;
     const iframe = document.createElement('iframe');
     iframe.name = iframeName;
     iframe.style.display = 'none';
 
     const form = document.createElement('form');
-    form.action = GAS_DIRECT_URL;            // langsung ke GAS /exec
+    form.action = GAS_DIRECT_URL;       // <- URL /exec terbaru yang aktif
     form.method = 'POST';
     form.enctype = 'multipart/form-data';
     form.target = iframeName;
     form.style.display = 'none';
 
-    // hidden fields
-    const hAction = document.createElement('input');
-    hAction.type = 'hidden'; hAction.name = 'action'; hAction.value = 'uploadImage';
-    const hSheet = document.createElement('input');
-    hSheet.type = 'hidden'; hSheet.name = 'sheet'; hSheet.value = sheet;
-    const hNo = document.createElement('input');
-    hNo.type = 'hidden'; hNo.name = 'no_surat_jalan'; hNo.value = no;
-    const hKind = document.createElement('input');
-    hKind.type = 'hidden'; hKind.name = 'kind'; hKind.value = kind;
+    // Hidden fields
+    const h = (name, value) => {
+      const i = document.createElement('input');
+      i.type = 'hidden'; i.name = name; i.value = value; 
+      form.appendChild(i);
+    };
+    h('action', 'uploadImage');
+    h('sheet', sheet);
+    h('no_surat_jalan', no);
+    h('kind', kind); // SURAT_JALAN | FOTO_UNIT
 
-    form.appendChild(hAction);
-    form.appendChild(hSheet);
-    form.appendChild(hNo);
-    form.appendChild(hKind);
-
-    // PENTING: pindahkan input file yang dipakai user ke dalam form,
-    // agar Browser mengirimkan file aslinya.
+    // PENTING: pindahkan input file asli ke form agar file terkirim
     const originalParent = inputEl.parentElement;
-    const placeholder = document.createElement('span'); // penanda posisi
+    const placeholder = document.createElement('span');
     originalParent.replaceChild(placeholder, inputEl);
     form.appendChild(inputEl);
 
-    // selesai submit → kembalikan input ke UI (sebagai input baru yang kosong)
+    // Selesai load (apapun statusnya), kembalikan input & resolve
     iframe.addEventListener('load', () => {
-      // bersihkan
+      // Bersihkan elemen sementara
       document.body.removeChild(iframe);
       document.body.removeChild(form);
 
-      // buat input baru agar user bisa upload lagi berikutnya
+      // Buat input baru kosong untuk upload berikutnya
       const newInput = document.createElement('input');
       newInput.type = 'file';
       newInput.className = 'file-input';
       newInput.accept = inputEl.accept || '.jpg,.jpeg,.png,.pdf';
-      // pasang di tempat semula
+      // Salin data-attribute agar tombol "Upload" masih menemukan input
+      if (inputEl.dataset.sj)   newInput.dataset.sj   = inputEl.dataset.sj;
+      if (inputEl.dataset.foto) newInput.dataset.foto = inputEl.dataset.foto;
+
       placeholder.replaceWith(newInput);
+
       resolve();
     });
 
-      document.body.appendChild(iframe);
-      document.body.appendChild(form);
-      form.submit();
+    document.body.appendChild(iframe);
+    document.body.appendChild(form);
+    form.submit();
   });
 }
 

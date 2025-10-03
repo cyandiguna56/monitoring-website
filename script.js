@@ -1,8 +1,9 @@
 // =======================================
 // KONFIGURASI
 // =======================================
-// Arahkan ke URL Cloudflare Worker kamu (bukan langsung ke /exec GAS)
-const SCRIPT_URL = 'https://cors-proxy-apps-script.cyandiguna56.workers.dev/'; // <-- pastikan ini benar
+// Arahkan ke URL Cloudflare Worker kamu (bukan langsung ke /exec GAS).
+// Worker ini meneruskan request ke GAS dan menambahkan header CORS.
+const SCRIPT_URL = 'https://cors-proxy-apps-script.cyandiguna56.workers.dev/';
 
 // Daftar sheet sumber data
 const SHEETS = ['MONITORING PISANG', 'MONITORING LOKAL', 'MONITORING FMCG', 'MONITORING IMPORT'];
@@ -10,9 +11,9 @@ const SHEETS = ['MONITORING PISANG', 'MONITORING LOKAL', 'MONITORING FMCG', 'MON
 // =======================================
 // UTIL
 // =======================================
-function fmt(v){ return v==null ? '' : String(v); }
+const fmt = (v) => (v == null ? '' : String(v));
 
-function normalizeType(u){
+function normalizeType(u) {
   const t = (fmt(u.JENIS_MUATAN)).toUpperCase();
   if (t.includes('PISANG')) return 'PISANG';
   if (t.includes('LOKAL'))  return 'LOKAL';
@@ -26,7 +27,7 @@ function normalizeType(u){
   return 'LOKAL';
 }
 
-function statusFromRow(r){
+function statusFromRow(r) {
   const hasStart  = r.START  && String(r.START).trim()  !== '';
   const hasFinish = r.FINISH && String(r.FINISH).trim() !== '';
   if (!hasStart && !hasFinish) return 'STANDBY';
@@ -34,7 +35,7 @@ function statusFromRow(r){
   return 'SELESAI';
 }
 
-function el(html){
+function el(html) {
   const t = document.createElement('template');
   t.innerHTML = html.trim();
   return t.content.firstElementChild;
@@ -53,19 +54,18 @@ let allUnits = [];                     // gabungan 4 sheet
 // =======================================
 // APP
 // =======================================
-class MonitoringSystem{
-  constructor(){
+class MonitoringSystem {
+  constructor() {
     this.bindNav();
     this.loadAllData();
   }
 
-  bindNav(){
-    const navRec   = document.getElementById('nav-receiving');
-    const navChk   = document.getElementById('nav-checker');
-    const reloadBtn= document.getElementById('reloadBtn');
+  bindNav() {
+    const navRec    = document.getElementById('nav-receiving');
+    const navChk    = document.getElementById('nav-checker');
+    const reloadBtn = document.getElementById('reloadBtn');
 
-    // switch mode
-    navRec.addEventListener('click', ()=>{
+    navRec.addEventListener('click', () => {
       currentMode = 'receiving';
       navRec.className = 'btn';
       navChk.className = 'btn-ghost';
@@ -73,7 +73,8 @@ class MonitoringSystem{
       document.getElementById('checker-page').classList.add('hidden');
       this.renderReceiving();
     });
-    navChk.addEventListener('click', ()=>{
+
+    navChk.addEventListener('click', () => {
       currentMode = 'checker';
       navChk.className = 'btn';
       navRec.className = 'btn-ghost';
@@ -82,125 +83,123 @@ class MonitoringSystem{
       this.renderChecker();
     });
 
-    reloadBtn.addEventListener('click', ()=> this.loadAllData());
+    reloadBtn.addEventListener('click', () => this.loadAllData());
 
-    // Receiving: jenis muatan tabs
-    document.querySelectorAll('[data-rec]').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
+    // Receiving tabs (jenis muatan)
+    document.querySelectorAll('[data-rec]').forEach(btn => {
+      btn.addEventListener('click', () => {
         currentReceivingFilter = btn.dataset.rec;
-        document.querySelectorAll('[data-rec]').forEach(b=>b.classList.remove('tab-active'));
+        document.querySelectorAll('[data-rec]').forEach(b => b.classList.remove('tab-active'));
         btn.classList.add('tab-active');
         document.getElementById('receiving-title').textContent = `Unit ${currentReceivingFilter}`;
         this.renderReceiving();
       });
     });
 
-    // Checker: jenis muatan filter
-    document.querySelectorAll('[data-filter]').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
+    // Checker filter (jenis muatan)
+    document.querySelectorAll('[data-filter]').forEach(btn => {
+      btn.addEventListener('click', () => {
         currentFilter = btn.dataset.filter;
-        document.querySelectorAll('[data-filter]').forEach(b=>b.classList.remove('tab-active'));
+        document.querySelectorAll('[data-filter]').forEach(b => b.classList.remove('tab-active'));
         btn.classList.add('tab-active');
         this.renderChecker();
       });
     });
 
-    // Checker: tab status
-    document.querySelectorAll('[data-tab]').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
+    // Checker tabs (status)
+    document.querySelectorAll('[data-tab]').forEach(btn => {
+      btn.addEventListener('click', () => {
         const tab = btn.dataset.tab; // standby | proses | selesai
-        document.querySelectorAll('[data-tab]').forEach(b=>b.classList.remove('tab-active'));
+        document.querySelectorAll('[data-tab]').forEach(b => b.classList.remove('tab-active'));
         btn.classList.add('tab-active');
-        ['standby','proses','selesai'].forEach(name=>{
-          document.getElementById(`${name}-section`).classList.toggle('hidden', name!==tab);
+        ['standby', 'proses', 'selesai'].forEach(name => {
+          document.getElementById(`${name}-section`).classList.toggle('hidden', name !== tab);
         });
       });
     });
 
     // backup logout
-    document.querySelectorAll('.logout-btn').forEach(a=>{
-      a.addEventListener('click', (e)=>{
+    document.querySelectorAll('.logout-btn').forEach(a => {
+      a.addEventListener('click', (e) => {
         e.preventDefault();
         if (confirm('Yakin ingin logout?')) auth.logout();
       });
     });
   }
 
-  async loadAllData(){
-    try{
-      const results = await Promise.all(SHEETS.map(s=>this.fetchSheet(s)));
+  async loadAllData() {
+    try {
+      const results = await Promise.all(SHEETS.map(s => this.fetchSheet(s)));
       allUnits = [];
-      results.forEach((rows, i)=>{
+      results.forEach((rows, i) => {
         const sheet = SHEETS[i];
-        rows.forEach(r=> allUnits.push({...r, __sheet: sheet}));
+        rows.forEach(r => allUnits.push({ ...r, __sheet: sheet }));
       });
       this.updateCounts();
-      (currentMode==='checker') ? this.renderChecker() : this.renderReceiving();
-    }catch(err){
+      (currentMode === 'checker') ? this.renderChecker() : this.renderReceiving();
+    } catch (err) {
       console.error('Gagal memuat data:', err);
       alert('Gagal memuat data. Coba Reload.');
     }
   }
 
-  async fetchSheet(sheetName){
-    // Semua GET lewat proxy Worker (CORS aman)
+  async fetchSheet(sheetName) {
+    // GET lewat Worker (CORS aman)
     const url = `${SCRIPT_URL}?sheet=${encodeURIComponent(sheetName)}`;
     const ctrl = new AbortController();
-    const to = setTimeout(()=>ctrl.abort(), 20000);
+    const to = setTimeout(() => ctrl.abort(), 20000);
     const res = await fetch(url, { signal: ctrl.signal });
     clearTimeout(to);
-    if(!res.ok) throw new Error(`HTTP ${res.status}`);
-    // Bisa jadi balikan bukan JSON valid → amankan
-    const text = await res.text();
-    try { return JSON.parse(text); } catch { throw new Error('Respon bukan JSON'); }
+    if (!res.ok) throw new Error(`HTTP ${res.status} saat GET sheet ${sheetName}`);
+    return await res.json();
   }
 
   // =========================
   // RECEIVING
   // =========================
-  renderReceiving(){
+  renderReceiving() {
     const container = document.getElementById('receiving-units');
     const empty     = document.getElementById('receiving-empty');
     container.innerHTML = '';
 
     const filtered = allUnits.filter(u => normalizeType(u) === currentReceivingFilter);
-    if(filtered.length === 0){
+    if (filtered.length === 0) {
       empty.classList.remove('hidden');
       return;
     }
     empty.classList.add('hidden');
 
-    filtered.forEach(u=>{
+    filtered.forEach(u => {
       const st = statusFromRow(u);
-      const badgeCls = st==='STANDBY' ? 'badge badge-standby' : (st==='PROSES' ? 'badge badge-proses' : 'badge badge-selesai');
+      const badgeCls = st === 'STANDBY' ? 'badge badge-standby' : (st === 'PROSES' ? 'badge badge-proses' : 'badge badge-selesai');
       const sjPreview = u.SURAT_JALAN_URL
         ? `<a href="${fmt(u.SURAT_JALAN_URL)}" target="_blank" class="text-sm" style="text-decoration:underline">Lihat Surat Jalan</a>`
         : `<span class="text-sm" style="color:#6b7280">Belum ada file</span>`;
 
       const card = el(`
         <div class="card">
-          <div class="row justify-between gap-4">
+          <div class="flex items-start justify-between gap-4">
             <div>
-              <div class="text-sm ink-soft">${u.__sheet}</div>
+              <div class="text-sm text-[color:var(--ink-soft)]">${u.__sheet}</div>
               <div class="text-lg font-semibold">${fmt(u.NO_SURAT_JALAN) || '-'}</div>
               <div class="text-sm">${fmt(u.NO_KENDARAAN) || '-'}</div>
-              <div class="text-sm" style="margin-top:.5rem">${sjPreview}</div>
+              <div class="text-sm mt-2">${sjPreview}</div>
             </div>
-            <div class="col" style="align-items:flex-end; position:relative">
+            <div class="text-right">
               <div class="${badgeCls}">${st}</div>
-              <div style="margin-top:.75rem; position:relative">
+              <div class="mt-3 relative">
                 <button class="btn-ghost" data-call="${fmt(u.NO_SURAT_JALAN)}" aria-haspopup="true" aria-expanded="false">PANGGIL ▾</button>
-                <div class="menu hidden" style="position:absolute; right:0; margin-top:.5rem; width:176px; background:#fff; border:1px solid var(--line); border-radius:.5rem; box-shadow:0 4px 12px rgba(0,0,0,.08); z-index:10;">
-                  <button class="btn-ghost" style="display:block; width:100%; text-align:left" data-call-action="BONGKAR" data-call-id="${fmt(u.NO_SURAT_JALAN)}">🚛 BONGKAR</button>
-                  <button class="btn-ghost" style="display:block; width:100%; text-align:left" data-call-action="AMBIL SURAT JALAN" data-call-id="${fmt(u.NO_SURAT_JALAN)}">📄 AMBIL SURAT JALAN</button>
+                <div class="hidden absolute right-0 mt-2 w-44 bg-white border border-[color:var(--line)] rounded shadow z-10 menu">
+                  <button class="w-full text-left px-3 py-2 hover:bg-gray-100" data-call-action="BONGKAR" data-call-id="${fmt(u.NO_SURAT_JALAN)}">🚛 BONGKAR</button>
+                  <button class="w-full text-left px-3 py-2 hover:bg-gray-100" data-call-action="AMBIL SURAT JALAN" data-call-id="${fmt(u.NO_SURAT_JALAN)}">📄 AMBIL SURAT JALAN</button>
                 </div>
               </div>
             </div>
           </div>
 
-          <div style="margin-top:1rem; border-top:1px solid var(--line); padding-top:1rem">
-            <div class="text-sm font-medium" style="margin-bottom:.5rem">Upload Surat Jalan (jpg/png/pdf)</div>
-            <div class="row gap-3" style="flex-wrap:wrap">
+          <div class="mt-4 border-t border-[color:var(--line)] pt-4">
+            <div class="text-sm font-medium mb-2">Upload Surat Jalan (jpg/png/pdf)</div>
+            <div class="flex items-center gap-3 flex-wrap">
               <input type="file" accept=".jpg,.jpeg,.png,.pdf" class="file-input" data-sj="${fmt(u.NO_SURAT_JALAN)}" />
               <button class="btn" data-upload-sj="${fmt(u.NO_SURAT_JALAN)}" data-sheet="${u.__sheet}">Upload</button>
             </div>
@@ -211,50 +210,50 @@ class MonitoringSystem{
     });
 
     // toggle menu panggil
-    container.querySelectorAll('[data-call]').forEach(btn=>{
-      btn.addEventListener('click', (e)=>{
+    container.querySelectorAll('[data-call]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
         const menu = e.currentTarget.parentElement.querySelector('.menu');
-        container.querySelectorAll('.menu').forEach(m=>{ if(m!==menu) m.classList.add('hidden'); });
+        container.querySelectorAll('.menu').forEach(m => { if (m !== menu) m.classList.add('hidden'); });
         const expanded = btn.getAttribute('aria-expanded') === 'true';
         btn.setAttribute('aria-expanded', String(!expanded));
         menu.classList.toggle('hidden');
       });
     });
     // aksi panggil
-    container.querySelectorAll('[data-call-action]').forEach(btn=>{
-      btn.addEventListener('click', (e)=>{
+    container.querySelectorAll('[data-call-action]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
         const id = e.currentTarget.dataset.callId;
         const action = e.currentTarget.dataset.callAction;
         alert(`🔊 PANGGILAN: ${id} - ${action}`);
-        container.querySelectorAll('.menu').forEach(m=>m.classList.add('hidden'));
+        container.querySelectorAll('.menu').forEach(m => m.classList.add('hidden'));
       });
     });
     // upload SJ
-    container.querySelectorAll('[data-upload-sj]').forEach(btn=>{
-      btn.addEventListener('click', async (e)=>{
+    container.querySelectorAll('[data-upload-sj]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
         const no = e.currentTarget.dataset.uploadSj;
         const sheet = e.currentTarget.dataset.sheet;
         const input = container.querySelector(`input[data-sj="${CSS.escape(no)}"]`);
         const file  = input?.files?.[0];
-        if(!file) return alert('Pilih file terlebih dahulu.');
-        await uploadFileToDrive({ sheet, no, kind:'SURAT_JALAN', file });
+        if (!file) return alert('Pilih file terlebih dahulu.');
+        await uploadFileToDrive({ sheet, no, kind: 'SURAT_JALAN', file });
         await sleep(700);
         await app.loadAllData();
       });
     });
 
     // close menu saat klik di luar
-    document.addEventListener('click', (ev)=>{
-      if(!ev.target.closest('[data-call]') && !ev.target.closest('.menu')){
-        container.querySelectorAll('.menu').forEach(m=>m.classList.add('hidden'));
+    document.addEventListener('click', (ev) => {
+      if (!ev.target.closest('[data-call]') && !ev.target.closest('.menu')) {
+        container.querySelectorAll('.menu').forEach(m => m.classList.add('hidden'));
       }
-    }, { once:true });
+    }, { once: true });
   }
 
   // =========================
   // CHECKER
   // =========================
-  renderChecker(){
+  renderChecker() {
     const qStandby = document.getElementById('standby-queue');
     const qProses  = document.getElementById('proses-queue');
     const qSelesai = document.getElementById('selesai-queue');
@@ -267,14 +266,14 @@ class MonitoringSystem{
     let list = allUnits;
     if (currentFilter !== 'ALL') list = list.filter(u => normalizeType(u) === currentFilter);
 
-    const buckets = { STANDBY:[], PROSES:[], SELESAI:[] };
+    const buckets = { STANDBY: [], PROSES: [], SELESAI: [] };
     list.forEach(u => buckets[statusFromRow(u)].push(u));
 
     const mono = "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace";
 
-    const makeCard = (u)=>{
+    const makeCard = (u) => {
       const st = statusFromRow(u);
-      const badgeCls = st==='STANDBY' ? 'badge badge-standby' : (st==='PROSES' ? 'badge badge-proses' : 'badge badge-selesai');
+      const badgeCls = st === 'STANDBY' ? 'badge badge-standby' : (st === 'PROSES' ? 'badge badge-proses' : 'badge badge-selesai');
       const fotoPreview = u.FOTO_UNIT_URL
         ? `<a href="${fmt(u.FOTO_UNIT_URL)}" target="_blank" class="text-sm" style="text-decoration:underline">Lihat Foto</a>`
         : `<span class="text-sm" style="color:#6b7280">Belum ada foto</span>`;
@@ -283,27 +282,27 @@ class MonitoringSystem{
 
       return el(`
         <div class="card">
-          <div class="row justify-between gap-4">
+          <div class="flex items-start justify-between gap-4">
             <div>
-              <div class="text-sm ink-soft">${u.__sheet}</div>
-              <div class="text-lg font-semibold">${fmt(u.NO_SURAT_JALAN)||'-'}</div>
-              <div class="text-sm">${fmt(u.NO_KENDARAAN)||'-'}</div>
-              <div class="text-sm ink-soft" style="margin-top:.25rem">Tgl Kedatangan: ${fmt(u.TANGGAL_KEDATANGAN)||'-'}</div>
-              <div class="text-sm" style="margin-top:.25rem">Start: <span style="font-family:${mono}">${showStart}</span> · Finish: <span style="font-family:${mono}">${showFinish}</span></div>
-              <div class="text-sm" style="margin-top:.5rem">${fotoPreview}</div>
+              <div class="text-sm text-[color:var(--ink-soft)]">${u.__sheet}</div>
+              <div class="text-lg font-semibold">${fmt(u.NO_SURAT_JALAN) || '-'}</div>
+              <div class="text-sm">${fmt(u.NO_KENDARAAN) || '-'}</div>
+              <div class="text-sm text-[color:var(--ink-soft)] mt-1">Tgl Kedatangan: ${fmt(u.TANGGAL_KEDATANGAN) || '-'}</div>
+              <div class="text-sm mt-1">Start: <span style="font-family:${mono}">${showStart}</span> · Finish: <span style="font-family:${mono}">${showFinish}</span></div>
+              <div class="text-sm mt-2">${fotoPreview}</div>
             </div>
-            <div class="col" style="align-items:flex-end">
+            <div class="text-right">
               <div class="${badgeCls}">${st}</div>
-              <div class="row gap-2" style="margin-top:.75rem">
-                ${st==='STANDBY' ? `<button class="btn" data-start="${fmt(u.NO_SURAT_JALAN)}" data-sheet="${u.__sheet}">START</button>` : ''}
-                ${st==='PROSES'  ? `<button class="btn" data-finish="${fmt(u.NO_SURAT_JALAN)}" data-sheet="${u.__sheet}">FINISH</button>
-                                    <button class="btn-ghost" data-cancel="${fmt(u.NO_SURAT_JALAN)}" data-sheet="${u.__sheet}">CANCEL</button>` : ''}
+              <div class="mt-3 flex gap-2">
+                ${st === 'STANDBY' ? `<button class="btn" data-start="${fmt(u.NO_SURAT_JALAN)}" data-sheet="${u.__sheet}">START</button>` : ''}
+                ${st === 'PROSES'  ? `<button class="btn" data-finish="${fmt(u.NO_SURAT_JALAN)}" data-sheet="${u.__sheet}">FINISH</button>
+                                      <button class="btn-ghost" data-cancel="${fmt(u.NO_SURAT_JALAN)}" data-sheet="${u.__sheet}">CANCEL</button>` : ''}
               </div>
             </div>
           </div>
-          <div style="margin-top:1rem; border-top:1px solid var(--line); padding-top:1rem">
-            <div class="text-sm font-medium" style="margin-bottom:.5rem">Upload Foto Unit (jpg/png)</div>
-            <div class="row gap-3" style="flex-wrap:wrap">
+          <div class="mt-4 border-t border-[color:var(--line)] pt-4">
+            <div class="text-sm font-medium mb-2">Upload Foto Unit (jpg/png)</div>
+            <div class="flex items-center gap-3 flex-wrap">
               <input type="file" accept=".jpg,.jpeg,.png" class="file-input" data-foto="${fmt(u.NO_SURAT_JALAN)}" />
               <button class="btn" data-upload-foto="${fmt(u.NO_SURAT_JALAN)}" data-sheet="${u.__sheet}">Upload</button>
             </div>
@@ -312,68 +311,68 @@ class MonitoringSystem{
       `);
     };
 
-    buckets.STANDBY.forEach(u=> qStandby.appendChild(makeCard(u)));
-    buckets.PROSES.forEach(u => qProses.appendChild(makeCard(u)));
-    buckets.SELESAI.forEach(u=> qSelesai.appendChild(makeCard(u)));
+    buckets.STANDBY.forEach(u => qStandby.appendChild(makeCard(u)));
+    buckets.PROSES.forEach(u  => qProses.appendChild(makeCard(u)));
+    buckets.SELESAI.forEach(u => qSelesai.appendChild(makeCard(u)));
 
-    emptyStandby.classList.toggle('hidden', buckets.STANDBY.length>0);
-    emptyProses .classList.toggle('hidden', buckets.PROSES.length>0);
-    emptySelesai.classList.toggle('hidden', buckets.SELESAI.length>0);
+    emptyStandby.classList.toggle('hidden', buckets.STANDBY.length > 0);
+    emptyProses .classList.toggle('hidden', buckets.PROSES.length > 0);
+    emptySelesai.classList.toggle('hidden', buckets.SELESAI.length > 0);
 
     // START
-    qStandby.querySelectorAll('[data-start]').forEach(btn=>{
-      btn.addEventListener('click', async (e)=>{
+    qStandby.querySelectorAll('[data-start]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
         const no = e.currentTarget.dataset.start;
         const sheet = e.currentTarget.dataset.sheet;
-        await updateStatusOnServer({ sheet, no, which:'START' });
-        await sleep(700);
+        await updateStatusOnServer({ sheet, no, which: 'START' });
+        await sleep(600);
         await app.loadAllData();
       });
     });
     // FINISH
-    qProses.querySelectorAll('[data-finish]').forEach(btn=>{
-      btn.addEventListener('click', async (e)=>{
+    qProses.querySelectorAll('[data-finish]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
         const no = e.currentTarget.dataset.finish;
         const sheet = e.currentTarget.dataset.sheet;
-        await updateStatusOnServer({ sheet, no, which:'FINISH' });
-        await sleep(700);
+        await updateStatusOnServer({ sheet, no, which: 'FINISH' });
+        await sleep(600);
         await app.loadAllData();
       });
     });
     // CANCEL
-    qProses.querySelectorAll('[data-cancel]').forEach(btn=>{
-      btn.addEventListener('click', async (e)=>{
+    qProses.querySelectorAll('[data-cancel]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
         const no = e.currentTarget.dataset.cancel;
         const sheet = e.currentTarget.dataset.sheet;
-        if(!confirm('Batalkan START untuk kembali ke STANDBY?')) return;
-        await updateStatusOnServer({ sheet, no, which:'CANCEL' });
-        await sleep(700);
+        if (!confirm('Batalkan START untuk kembali ke STANDBY?')) return;
+        await updateStatusOnServer({ sheet, no, which: 'CANCEL' });
+        await sleep(600);
         await app.loadAllData();
       });
     });
 
     // Upload Foto
-    ;[qStandby,qProses,qSelesai].forEach(scope=>{
-      scope.querySelectorAll('[data-upload-foto]').forEach(btn=>{
-        btn.addEventListener('click', async (e)=>{
+    ;[qStandby, qProses, qSelesai].forEach(scope => {
+      scope.querySelectorAll('[data-upload-foto]').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
           const no = e.currentTarget.dataset.uploadFoto;
           const sheet = e.currentTarget.dataset.sheet;
           const input = scope.querySelector(`input[data-foto="${CSS.escape(no)}"]`);
           const file  = input?.files?.[0];
-          if(!file) return alert('Pilih foto terlebih dahulu.');
-          await uploadFileToDrive({ sheet, no, kind:'FOTO_UNIT', file });
-          await sleep(900);
+          if (!file) return alert('Pilih foto terlebih dahulu.');
+          await uploadFileToDrive({ sheet, no, kind: 'FOTO_UNIT', file });
+          await sleep(800);
           await app.loadAllData();
         });
       });
     });
   }
 
-  updateCounts(){
-    const counts = { PISANG:0, LOKAL:0, FMCG:0, IMPORT:0 };
-    allUnits.forEach(u=>{
+  updateCounts() {
+    const counts = { PISANG: 0, LOKAL: 0, FMCG: 0, IMPORT: 0 };
+    allUnits.forEach(u => {
       const t = normalizeType(u);
-      if(counts[t] != null) counts[t]++;
+      if (counts[t] != null) counts[t]++;
     });
     document.getElementById('count-pisang').textContent = counts.PISANG || 0;
     document.getElementById('count-lokal').textContent  = counts.LOKAL  || 0;
@@ -385,49 +384,49 @@ class MonitoringSystem{
 // =======================================
 // SERVER CALLS (via Worker — CORS aman)
 // =======================================
-async function updateStatusOnServer({ sheet, no, which }){
-  const fd = new FormData();
-  fd.append('action','updateStatus');
-  fd.append('sheet',sheet);
-  fd.append('no_surat_jalan',no);
-  fd.append('which',which);
-
-  // 1) Coba POST via Worker
+async function updateStatusOnServer({ sheet, no, which }) {
+  // 1) Coba GET (fallback yang didukung doGet)
+  const getUrl = `${SCRIPT_URL}?action=updateStatus&sheet=${encodeURIComponent(sheet)}&no_surat_jalan=${encodeURIComponent(no)}&which=${encodeURIComponent(which)}`;
   try {
-    const res = await fetch(SCRIPT_URL, { method:'POST', body:fd });
-    const text = await res.text();
-    let data = {};
-    try { data = JSON.parse(text); } catch {}
-    if (!res.ok || data.error) throw new Error(data.message || ('POST gagal '+res.status));
-    return data;
-  } catch (err) {
-    console.warn('POST updateStatus gagal, fallback GET:', err.message);
-    // 2) Fallback GET (Apps Script doGet => action=updateStatus)
-    const url = `${SCRIPT_URL}?action=updateStatus&sheet=${encodeURIComponent(sheet)}&no_surat_jalan=${encodeURIComponent(no)}&which=${encodeURIComponent(which)}`;
-    const r2 = await fetch(url);
-    const t2 = await r2.text();
-    let d2 = {};
-    try { d2 = JSON.parse(t2); } catch {}
-    if (!r2.ok || d2.error) throw new Error(d2.message || ('GET fallback gagal '+r2.status));
-    return d2;
+    const r = await fetch(getUrl, { method: 'GET' });
+    if (r.ok) {
+      // optional: cek payload
+      // const j = await r.json();
+      return;
+    }
+    // jika GET gagal, lanjut coba POST
+  } catch (_) {
+    // lanjut ke POST
   }
-}
 
-async function uploadFileToDrive({ sheet, no, kind, file }){
+  // 2) Coba POST (kalau Worker/GAS sudah siap menerima doPost)
   const fd = new FormData();
-  fd.append('action','uploadImage');
-  fd.append('sheet',sheet);
-  fd.append('no_surat_jalan',no);
-  fd.append('kind',kind); // SURAT_JALAN | FOTO_UNIT
-  fd.append('file',file,file.name);
+  fd.append('action', 'updateStatus');
+  fd.append('sheet', sheet);
+  fd.append('no_surat_jalan', no);
+  fd.append('which', which);
 
-  const res = await fetch(SCRIPT_URL, { method:'POST', body:fd });
-  const text = await res.text();
-  let data = {};
-  try { data = JSON.parse(text); } catch {}
-  if (!res.ok || data.error) {
-    console.error('Upload gagal:', text);
-    throw new Error(data.message || ('Upload gagal '+res.status));
+  const res = await fetch(SCRIPT_URL, { method: 'POST', body: fd });
+  if (!res.ok) {
+    console.warn('POST updateStatus gagal, status:', res.status);
+    alert('Gagal mengirim perintah ke server (updateStatus).');
   }
-  return data;
 }
+
+async function uploadFileToDrive({ sheet, no, kind, file }) {
+  const fd = new FormData();
+  fd.append('action', 'uploadImage');
+  fd.append('sheet', sheet);
+  fd.append('no_surat_jalan', no);
+  fd.append('kind', kind); // SURAT_JALAN | FOTO_UNIT
+  fd.append('file', file, file.name);
+
+  const res = await fetch(SCRIPT_URL, { method: 'POST', body: fd });
+  if (!res.ok) {
+    console.error('Upload gagal, status:', res.status);
+    alert('Upload gagal. Coba lagi.');
+  }
+}
+
+// Expose class (dipanggil dari dashboard.html setelah auth)
+window.MonitoringSystem = MonitoringSystem;

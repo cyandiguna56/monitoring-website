@@ -4,92 +4,33 @@
   <meta charset="UTF-8" />
   <title>Receiving & Checker - Monitoring System</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-  <!-- Favicon emoji agar tidak 404 -->
   <link rel="icon"
         href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>">
-
   <style>
-    /* ====== Skema warna ====== */
-    :root {
-      --ink: #111;
-      --ink-soft: #4b5563;
-      --paper: #fff;
-      --line: #e5e7eb;
-      --container: 1280px; /* kira-kira 7xl */
-    }
-    html, body { height: 100%; }
-    body { margin:0; color:var(--ink); background:var(--paper); font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
-
-    /* ====== Layout helpers (mini utilities, bukan Tailwind) ====== */
-    .container { max-width: var(--container); margin-inline:auto; padding-inline: 16px; }
-    .row { display:flex; }
-    .col { display:flex; flex-direction:column; }
-    .flex { display:flex; }
-    .items-center { align-items:center; }
-    .justify-between { justify-content:space-between; }
-    .gap-2 { gap:.5rem; }
-    .gap-3 { gap:.75rem; }
-    .gap-4 { gap:1rem; }
-    .ml-auto { margin-left:auto; }
-    .py-4 { padding-block:1rem; }
-    .py-8 { padding-block:2rem; }
-    .mb-6 { margin-bottom:1.5rem; }
-    .mb-4 { margin-bottom:1rem; }
-
-    .hidden { display:none !important; }
-    .ink-soft { color: var(--ink-soft); }
-    .line { border-color: var(--line); }
-
-    /* ====== Tipografi ====== */
-    .text-xl { font-size:1.25rem; line-height:1.75rem; }
-    .text-lg { font-size:1.125rem; line-height:1.75rem; }
-    .text-sm { font-size:.875rem; line-height:1.25rem; }
-    .font-bold { font-weight:700; }
-    .font-semibold { font-weight:600; }
-    .tracking-tight { letter-spacing:-0.01em; }
-
-    /* ====== Komponen ====== */
-    header { border-bottom:1px solid var(--line); background:#fff; }
-    .card{
-      background:#fff; border:1px solid var(--line); border-radius:.75rem; padding:1.25rem;
-      box-shadow:0 1px 2px rgba(0,0,0,.03)
-    }
-
-    .btn{
-      padding:.5rem 1rem; border:1px solid #000; border-radius:.5rem; background:#fff; color:#000;
-      transition: background-color .2s, color .2s, border-color .2s;
-      cursor:pointer;
-    }
-    .btn:hover{ background:#000; color:#fff; }
-
-    .btn-ghost{
-      padding:.5rem 1rem; border:1px solid transparent; border-radius:.5rem; background:transparent; color:#000;
-      transition: background-color .2s, border-color .2s; cursor:pointer;
-    }
-    .btn-ghost:hover{ background:#f3f4f6; }
-
-    .tab{
-      flex:1 1 auto; text-align:center; padding:.75rem; border:1px solid var(--line); border-radius:.5rem;
-      transition: background-color .2s, color .2s, border-color .2s; cursor:pointer; background:#fff;
-    }
-    .tab:hover{ background:#f3f4f6; }
-    .tab-active{ background:#000 !important; color:#fff !important; border-color:#000 !important; }
-
-    .badge{
-      display:inline-flex; align-items:center; padding:.125rem .5rem; border-radius:.375rem; border:1px solid #000; font-size:.75rem
-    }
-    .badge-standby{ border-color:#9ca3af; color:#374151; }
-    .badge-proses{ border-color:#000; color:#000; }
-    .badge-selesai{ background:#111; border-color:#111; color:#fff; }
-
-    /* Spasi tumpuk vertikal untuk container list */
-    .stack > * + * { margin-top: 1rem; }
+    :root { --ink:#111; --ink-soft:#4b5563; --paper:#fff; --line:#e5e7eb; --container:1280px; }
+    html,body{height:100%} body{margin:0;color:var(--ink);background:var(--paper);font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif}
+    .container{max-width:var(--container);margin-inline:auto;padding-inline:16px}
+    .row{display:flex}.col{display:flex;flex-direction:column}.flex{display:flex}
+    .items-center{align-items:center}.justify-between{justify-content:space-between}
+    .gap-2{gap:.5rem}.gap-3{gap:.75rem}.gap-4{gap:1rem}.ml-auto{margin-left:auto}
+    .py-4{padding-block:1rem}.py-8{padding-block:2rem}.mb-6{margin-bottom:1.5rem}.mb-4{margin-bottom:1rem}
+    .hidden{display:none!important}.ink-soft{color:var(--ink-soft)}.line{border-color:var(--line)}
+    .text-xl{font-size:1.25rem;line-height:1.75rem}.text-lg{font-size:1.125rem;line-height:1.75rem}
+    .text-sm{font-size:.875rem;line-height:1.25rem}.font-bold{font-weight:700}.font-semibold{font-weight:600}.tracking-tight{letter-spacing:-.01em}
+    header{border-bottom:1px solid var(--line);background:#fff}
+    .card{background:#fff;border:1px solid var(--line);border-radius:.75rem;padding:1.25rem;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+    .btn{padding:.5rem 1rem;border:1px solid #000;border-radius:.5rem;background:#fff;color:#000;transition:background-color .2s,color .2s,border-color .2s;cursor:pointer}
+    .btn:hover{background:#000;color:#fff}
+    .btn-ghost{padding:.5rem 1rem;border:1px solid transparent;border-radius:.5rem;background:transparent;color:#000;transition:background-color .2s,border-color .2s;cursor:pointer}
+    .btn-ghost:hover{background:#f3f4f6}
+    .tab{flex:1 1 auto;text-align:center;padding:.75rem;border:1px solid var(--line);border-radius:.5rem;transition:.2s;cursor:pointer;background:#fff}
+    .tab:hover{background:#f3f4f6}.tab-active{background:#000!important;color:#fff!important;border-color:#000!important}
+    .badge{display:inline-flex;align-items:center;padding:.125rem .5rem;border-radius:.375rem;border:1px solid #000;font-size:.75rem}
+    .badge-standby{border-color:#9ca3af;color:#374151}.badge-proses{border-color:#000;color:#000}.badge-selesai{background:#111;border-color:#111;color:#fff}
+    .stack>*+*{margin-top:1rem}
   </style>
 </head>
 <body class="col" style="min-height:100vh">
-
-  <!-- Header -->
   <header>
     <div class="container row items-center justify-between py-4">
       <div class="row items-center gap-2">
@@ -103,21 +44,16 @@
     </div>
   </header>
 
-  <!-- Main -->
   <main class="container col" style="flex:1">
     <div class="py-8">
-      <!-- Nav Mode -->
       <div class="mb-6 row gap-3">
         <button id="nav-receiving" class="btn-ghost" aria-pressed="false">Receiving</button>
         <button id="nav-checker" class="btn" aria-pressed="true">Checker</button>
-        <div class="ml-auto">
-          <button id="reloadBtn" class="btn">Reload Data</button>
-        </div>
+        <div class="ml-auto"><button id="reloadBtn" class="btn">Reload Data</button></div>
       </div>
 
       <!-- RECEIVING -->
       <section id="receiving-page" class="hidden" aria-labelledby="receiving-title">
-        <!-- Filter Unit Type -->
         <div class="card mb-6">
           <div class="row gap-2">
             <button data-rec="PISANG" class="tab tab-active" aria-current="true">PISANG</button>
@@ -126,14 +62,13 @@
             <button data-rec="IMPORT" class="tab">IMPORT</button>
           </div>
         </div>
-
         <div class="card">
           <div class="row items-center justify-between mb-4">
             <h2 id="receiving-title" class="text-lg font-semibold tracking-tight">Unit PISANG</h2>
             <div class="text-sm ink-soft">Klik “PANGGIL” / upload Surat Jalan</div>
           </div>
           <div id="receiving-units" class="stack"></div>
-          <div id="receiving-empty" class="hidden" style="text-align:center; padding:2.5rem 0;">
+          <div id="receiving-empty" class="hidden" style="text-align:center;padding:2.5rem 0;">
             <span class="ink-soft">Tidak ada data.</span>
           </div>
         </div>
@@ -141,7 +76,6 @@
 
       <!-- CHECKER -->
       <section id="checker-page" aria-label="Checker">
-        <!-- Filter Jenis Muatan -->
         <div class="card mb-6">
           <div class="row items-center gap-2" style="flex-wrap:wrap">
             <button data-filter="ALL"    class="tab tab-active" aria-current="true">SEMUA</button>
@@ -152,7 +86,6 @@
           </div>
         </div>
 
-        <!-- Tabs Status -->
         <div class="card mb-6">
           <div class="row gap-2">
             <button data-tab="standby" class="tab tab-active" aria-current="true">Standby</button>
@@ -161,24 +94,23 @@
           </div>
         </div>
 
-        <!-- Lists -->
         <div id="standby-section" class="stack">
           <div id="standby-queue" class="stack"></div>
-          <div id="standby-empty" class="hidden" style="text-align:center; padding:2.5rem 0;">
+          <div id="standby-empty" class="hidden" style="text-align:center;padding:2.5rem 0;">
             <span class="ink-soft">Tidak ada unit dalam standby.</span>
           </div>
         </div>
 
         <div id="proses-section" class="hidden stack">
           <div id="proses-queue" class="stack"></div>
-          <div id="proses-empty" class="hidden" style="text-align:center; padding:2.5rem 0;">
+          <div id="proses-empty" class="hidden" style="text-align:center;padding:2.5rem 0;">
             <span class="ink-soft">Tidak ada unit dalam proses.</span>
           </div>
         </div>
 
         <div id="selesai-section" class="hidden stack">
           <div id="selesai-queue" class="stack"></div>
-          <div id="selesai-empty" class="hidden" style="text-align:center; padding:2.5rem 0;">
+          <div id="selesai-empty" class="hidden" style="text-align:center;padding:2.5rem 0;">
             <span class="ink-soft">Belum ada unit selesai.</span>
           </div>
         </div>
@@ -186,14 +118,13 @@
     </div>
   </main>
 
-  <!-- Scripts -->
   <script src="auth.js" defer></script>
   <script src="script.js" defer></script>
   <script>
     document.addEventListener("DOMContentLoaded", () => {
       if (typeof auth !== 'undefined' && auth.requireAuth()) {
         auth.updateUserInfo();
-        window.app = new MonitoringSystem(); // init app
+        window.app = new MonitoringSystem();
       }
     });
   </script>

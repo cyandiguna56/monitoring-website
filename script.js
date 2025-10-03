@@ -1,13 +1,8 @@
 // =======================================
 // KONFIGURASI
 // =======================================
-// Semua GET/POST ringan lewat Cloudflare Worker (menambah header CORS)
 const SCRIPT_URL = 'https://cors-proxy-apps-script.cyandiguna56.workers.dev/';
-
-// Khusus upload file, kirim LANGSUNG ke Apps Script (tanpa Worker) via form+iframe
 const GAS_DIRECT_URL = 'https://script.google.com/macros/s/AKfycbzYdYDoXyovrX2p13_Oph1uhLaJLlgYvN3C-mfOPtAcnZhc8jLEQigPVlZwbalIr-NWfg/exec';
-
-// Daftar sheet sumber data
 const SHEETS = ['MONITORING PISANG','MONITORING LOKAL','MONITORING FMCG','MONITORING IMPORT'];
 
 // =======================================
@@ -48,10 +43,10 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 // =======================================
 // APP STATE
 // =======================================
-let currentMode = 'checker';           // 'checker' | 'receiving'
-let currentFilter = 'ALL';             // filter di Checker
-let currentReceivingFilter = 'PISANG'; // filter di Receiving
-let allUnits = [];                     // gabungan 4 sheet
+let currentMode = 'checker';
+let currentFilter = 'ALL';
+let currentReceivingFilter = 'PISANG';
+let allUnits = [];
 
 // =======================================
 // APP
@@ -87,7 +82,6 @@ class MonitoringSystem{
 
     reloadBtn.addEventListener('click', ()=> this.loadAllData());
 
-    // Receiving tabs
     document.querySelectorAll('[data-rec]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         currentReceivingFilter = btn.dataset.rec;
@@ -98,7 +92,6 @@ class MonitoringSystem{
       });
     });
 
-    // Checker filter
     document.querySelectorAll('[data-filter]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         document.querySelectorAll('[data-filter]').forEach(b=>b.classList.remove('tab-active'));
@@ -108,19 +101,17 @@ class MonitoringSystem{
       });
     });
 
-    // Checker tabs (status)
     document.querySelectorAll('[data-tab]').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         document.querySelectorAll('[data-tab]').forEach(b=>b.classList.remove('tab-active'));
         btn.classList.add('tab-active');
-        const tab = btn.dataset.tab; // standby | proses | selesai
+        const tab = btn.dataset.tab;
         ['standby','proses','selesai'].forEach(name=>{
           document.getElementById(`${name}-section`).classList.toggle('hidden', name!==tab);
         });
       });
     });
 
-    // backup logout
     document.querySelectorAll('.logout-btn').forEach(a=>{
       a.addEventListener('click', (e)=>{
         e.preventDefault();
@@ -139,6 +130,7 @@ class MonitoringSystem{
       });
       this.updateCounts();
       (currentMode==='checker') ? this.renderChecker() : this.renderReceiving();
+      console.log('== DATA LOADED ==', { total: allUnits.length });
     }catch(err){
       console.error('Gagal memuat data:', err);
       alert('Gagal memuat data. Coba Reload.');
@@ -146,7 +138,6 @@ class MonitoringSystem{
   }
 
   async fetchSheet(sheetName){
-    // GET lewat Worker (CORS aman)
     const url = `${SCRIPT_URL}?sheet=${encodeURIComponent(sheetName)}`;
     const ctrl = new AbortController();
     const to = setTimeout(()=>ctrl.abort(), 20000);
@@ -156,9 +147,7 @@ class MonitoringSystem{
     return await res.json();
   }
 
-  // =========================
-  // RECEIVING
-  // =========================
+  // ============== RECEIVING ==============
   renderReceiving(){
     const container = document.getElementById('receiving-units');
     const empty     = document.getElementById('receiving-empty');
@@ -182,7 +171,7 @@ class MonitoringSystem{
         <div class="card">
           <div class="flex items-start justify-between gap-4">
             <div>
-              <div class="text-sm text-[color:var(--ink-soft)]">${u.__sheet}</div>
+              <div class="text-sm ink-soft">${u.__sheet}</div>
               <div class="text-lg font-semibold">${fmt(u.NO_SURAT_JALAN) || '-'}</div>
               <div class="text-sm">${fmt(u.NO_KENDARAAN) || '-'}</div>
               <div class="text-sm mt-2">${sjPreview}</div>
@@ -211,7 +200,6 @@ class MonitoringSystem{
       container.appendChild(card);
     });
 
-    // toggle menu panggil
     container.querySelectorAll('[data-call]').forEach(btn=>{
       btn.addEventListener('click', (e)=>{
         const menu = e.currentTarget.parentElement.querySelector('.menu');
@@ -222,7 +210,6 @@ class MonitoringSystem{
       });
     });
 
-    // aksi panggil
     container.querySelectorAll('[data-call-action]').forEach(btn=>{
       btn.addEventListener('click', (e)=>{
         const id = e.currentTarget.dataset.callId;
@@ -232,7 +219,7 @@ class MonitoringSystem{
       });
     });
 
-    // upload SJ
+    // Upload SJ
     container.querySelectorAll('[data-upload-sj]').forEach(btn=>{
       btn.addEventListener('click', async (e)=>{
         const no = e.currentTarget.dataset.uploadSj;
@@ -241,12 +228,9 @@ class MonitoringSystem{
         const file  = input?.files?.[0];
         if(!file) return alert('Pilih file terlebih dahulu.');
         await uploadFileToDrive({ sheet, no, kind:'SURAT_JALAN', file, inputEl: input });
-        await sleep(700);
-        await app.loadAllData();
       });
     });
 
-    // close menu saat klik di luar
     document.addEventListener('click', (ev)=>{
       if(!ev.target.closest('[data-call]') && !ev.target.closest('.menu')){
         container.querySelectorAll('.menu').forEach(m=>m.classList.add('hidden'));
@@ -254,9 +238,7 @@ class MonitoringSystem{
     }, { once:true });
   }
 
-  // =========================
-  // CHECKER
-  // =========================
+  // ============== CHECKER ==============
   renderChecker(){
     const qStandby = document.getElementById('standby-queue');
     const qProses  = document.getElementById('proses-queue');
@@ -273,7 +255,7 @@ class MonitoringSystem{
     const buckets = { STANDBY:[], PROSES:[], SELESAI:[] };
     list.forEach(u => buckets[statusFromRow(u)].push(u));
 
-    const mono = "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace";
+    const mono = "ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,'Liberation Mono','Courier New',monospace";
 
     const makeCard = (u)=>{
       const st = statusFromRow(u);
@@ -288,10 +270,10 @@ class MonitoringSystem{
         <div class="card">
           <div class="flex items-start justify-between gap-4">
             <div>
-              <div class="text-sm text-[color:var(--ink-soft)]">${u.__sheet}</div>
+              <div class="text-sm ink-soft">${u.__sheet}</div>
               <div class="text-lg font-semibold">${fmt(u.NO_SURAT_JALAN)||'-'}</div>
               <div class="text-sm">${fmt(u.NO_KENDARAAN)||'-'}</div>
-              <div class="text-sm text-[color:var(--ink-soft)] mt-1">Tgl Kedatangan: ${fmt(u.TANGGAL_KEDATANGAN)||'-'}</div>
+              <div class="text-sm ink-soft mt-1">Tgl Kedatangan: ${fmt(u.TANGGAL_KEDATANGAN)||'-'}</div>
               <div class="text-sm mt-1">Start: <span style="font-family:${mono}">${showStart}</span> · Finish: <span style="font-family:${mono}">${showFinish}</span></div>
               <div class="text-sm mt-2">${fotoPreview}</div>
             </div>
@@ -365,8 +347,6 @@ class MonitoringSystem{
           const file  = input?.files?.[0];
           if(!file) return alert('Pilih foto terlebih dahulu.');
           await uploadFileToDrive({ sheet, no, kind:'FOTO_UNIT', file, inputEl: input });
-          await sleep(800);
-          await app.loadAllData();
         });
       });
     });
@@ -389,14 +369,12 @@ class MonitoringSystem{
 // SERVER CALLS
 // =======================================
 async function updateStatusOnServer({ sheet, no, which }){
-  // 1) Coba GET (fallback via doGet)
   const getUrl = `${SCRIPT_URL}?action=updateStatus&sheet=${encodeURIComponent(sheet)}&no_surat_jalan=${encodeURIComponent(no)}&which=${encodeURIComponent(which)}`;
   try {
     const r = await fetch(getUrl, { method:'GET' });
     if (r.ok) return;
-  } catch (_) { /* lanjut ke POST */ }
+  } catch (_) {}
 
-  // 2) Coba POST via Worker
   const fd = new FormData();
   fd.append('action','updateStatus');
   fd.append('sheet',sheet);
@@ -411,16 +389,28 @@ async function updateStatusOnServer({ sheet, no, which }){
 }
 
 async function uploadFileToDrive({ sheet, no, kind, file, inputEl }){
-  // Validasi
   if (!file || !inputEl || !(inputEl instanceof HTMLInputElement)) {
     alert('Pilih file terlebih dahulu.');
     return;
   }
 
-  // ⬅️ WAJIB: beri name="file" agar terbaca sebagai e.files.file di Apps Script
+  // name="file" WAJIB agar terbaca sebagai e.files.file
   inputEl.name = 'file';
 
-  // Upload langsung ke GAS via form + iframe (bypass CORS)
+  // Terima respon dari GAS (via postMessage)
+  const onMsg = (ev) => {
+    if (ev && ev.data && typeof ev.data === 'object') {
+      console.log('[GAS upload reply]', ev.data);
+      if (ev.data.ok) {
+        console.info('✅ Upload sukses:', ev.data.url);
+      } else {
+        console.warn('⚠️ Upload gagal:', ev.data.msg);
+        alert('Upload gagal: ' + (ev.data.msg || 'Unknown'));
+      }
+    }
+  };
+  window.addEventListener('message', onMsg, { once:true });
+
   await new Promise((resolve)=>{
     const iframeName = `uploadFrame_${Date.now()}`;
     const iframe = document.createElement('iframe');
@@ -439,23 +429,22 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }){
       i.type = 'hidden'; i.name = n; i.value = v;
       form.appendChild(i);
     };
-    addHidden('action','uploadImage');
+    addHidden('action','uploadimage');   // ← endpoint final
     addHidden('sheet',sheet);
     addHidden('no_surat_jalan',no);
-    addHidden('kind',kind); // SURAT_JALAN | FOTO_UNIT
+    addHidden('kind',kind);              // SURAT_JALAN | FOTO_UNIT
 
-    // Pindahkan input file asli ke form
-    const originalParent = inputEl.parentElement;
+    // pindahkan input file ke form (bypass CORS)
+    const parent = inputEl.parentElement;
     const placeholder = document.createElement('span');
-    originalParent.replaceChild(placeholder, inputEl);
+    parent.replaceChild(placeholder, inputEl);
     form.appendChild(inputEl);
 
     iframe.addEventListener('load', ()=>{
-      // Bersih-bersih
       document.body.removeChild(iframe);
       document.body.removeChild(form);
 
-      // Ganti input baru (kosong) di posisi semula
+      // ganti input baru
       const newInput = document.createElement('input');
       newInput.type = 'file';
       newInput.className = 'file-input';
@@ -469,9 +458,14 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }){
 
     document.body.appendChild(iframe);
     document.body.appendChild(form);
+    console.log('🔼 Submit upload form → GAS', { sheet, no, kind });
     form.submit();
   });
+
+  // reload data supaya URL tampil
+  await sleep(700);
+  await app.loadAllData();
 }
 
-// Expose class (dipanggil dari dashboard.html setelah auth)
+// Expose class
 window.MonitoringSystem = MonitoringSystem;

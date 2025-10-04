@@ -2,7 +2,7 @@
 // KONFIGURASI
 // =======================================
 const SCRIPT_URL = 'https://cors-proxy-apps-script.cyandiguna56.workers.dev/';
-const GAS_DIRECT_URL = 'https://script.google.com/macros/s/AKfycbzYdYDoXyovrX2p13_Oph1uhLaJLlgYvN3C-mfOPtAcnZhc8jLEQigPVlZwbalIr-NWfg/exec';
+const GAS_DIRECT_URL = 'https://script.googleusercontent.com/macros/echo?user_content_key=AehSKLg5XKhO4bKy68QQZnnk1lpqmPoz8lk2OVs2Sda_kDCAuCN_gwftfFlsM1OfJMgGgL8BRAGtx-gM7XKlXF81ePHOMD3q9lo90IS2MOan7QzogbntIp5WlgPsR5Z44lYzExCItK2-o_n-K9oXhgqbLiLHnkrItfqdO7dA-7Po4ZayHURAivaY1OmdrJQ43iGUYaZt93Cuo4yEPUiiS2qr_4oojhvKrWfEp28lajsqD9gctl17GBlikKqyCh57jwTOXubGF5CfPLc6f7wufatwmOJDzsVkQsJ86xgTuVcT&lib=MFMnwREcxC5mYD-2uaksV3dQSj6r8oaPZ';
 const SHEETS = ['MONITORING PISANG','MONITORING LOKAL','MONITORING FMCG','MONITORING IMPORT'];
 
 // =======================================

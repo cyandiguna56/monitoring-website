@@ -353,7 +353,7 @@ async function updateStatusOnServer({sheet,no,which}){
 }
 
 // =======================================
-// UPLOAD FILE - IFRAME METHOD (NO CORS ERROR)
+// UPLOAD FILE - DENGAN ORIGIN CHECK
 // =======================================
 async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
   if (!file) {
@@ -370,14 +370,12 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
   });
 
   return new Promise((resolve) => {
-    // Buat iframe untuk handle response
     const iframeName = 'uploadFrame_' + Date.now();
     const iframe = document.createElement('iframe');
     iframe.name = iframeName;
     iframe.style.display = 'none';
     document.body.appendChild(iframe);
 
-    // Buat form
     const form = document.createElement('form');
     form.action = GAS_DIRECT_URL;
     form.method = 'POST';
@@ -385,7 +383,6 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
     form.target = iframeName;
     form.style.display = 'none';
 
-    // Tambahkan field ke form
     const addField = (name, value) => {
       const input = document.createElement('input');
       input.type = 'hidden';
@@ -394,60 +391,47 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
       form.appendChild(input);
     };
 
-    addField('action', 'uploadimage');
+    addField('action', 'uploadonly'); // Tetap pakai uploadonly dulu untuk testing
     addField('sheet', sheet);
     addField('no_surat_jalan', no);
     addField('kind', kind);
 
-    // Handle file input - PINDAHKAN input asli ke form
+    // Handle file input
     const originalParent = inputEl.parentNode;
-    const originalNextSibling = inputEl.nextSibling;
-    
-    // Pindahkan input file asli ke form
     inputEl.name = 'file';
     form.appendChild(inputEl);
 
-    // Fungsi cleanup
     const cleanup = () => {
-      // Hapus iframe dan form
       if (iframe.parentNode) document.body.removeChild(iframe);
       if (form.parentNode) document.body.removeChild(form);
     };
 
-    // Fungsi restore input
     const restoreInput = () => {
-      // Buat input baru untuk menggantikan yang dipindahkan
       const newInput = document.createElement('input');
       newInput.type = 'file';
       newInput.className = 'file-input';
       newInput.accept = inputEl.accept;
-      
-      // Copy data attributes
       if (inputEl.dataset.sj) newInput.dataset.sj = inputEl.dataset.sj;
       if (inputEl.dataset.foto) newInput.dataset.foto = inputEl.dataset.foto;
-      
-      // Tempatkan di posisi semula
-      if (originalParent) {
-        if (originalNextSibling) {
-          originalParent.insertBefore(newInput, originalNextSibling);
-        } else {
-          originalParent.appendChild(newInput);
-        }
-      }
+      if (originalParent) originalParent.appendChild(newInput);
     };
 
-    // Event listener untuk message dari iframe
     const handleMessage = (event) => {
-      // Terima semua message, filter berdasarkan data
+      // ✅ TAMBAHKAN ORIGIN CHECK
+      if (event.origin !== 'https://script.google.com' && 
+          event.origin !== 'https://cyandiguna56.github.io') {
+        console.log('Ignoring message from unknown origin:', event.origin);
+        return;
+      }
+      
       if (typeof event.data !== 'object' || event.data === null) return;
       
-      console.log('📨 Message received:', event.data);
+      console.log('📨 Message received from:', event.origin, event.data);
       
-      // Hanya proses jika ada property 'ok'
       if ('ok' in event.data) {
         if (event.data.ok) {
           console.log('✅ Upload sukses:', event.data.url);
-          alert('✅ Upload sukses!\nFile tersimpan di Drive.');
+          alert('✅ Upload sukses!\nURL: ' + event.data.url);
           restoreInput();
         } else {
           console.error('❌ Upload gagal:', event.data.msg);
@@ -463,22 +447,20 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
 
     window.addEventListener('message', handleMessage);
 
-    // Submit form
     document.body.appendChild(form);
     console.log('📤 Submitting form to GAS...');
     form.submit();
 
-    // Safety timeout
+    // Safety timeout - kurangi jadi 10 detik
     setTimeout(() => {
       window.removeEventListener('message', handleMessage);
       cleanup();
       restoreInput();
-      alert('❌ Upload gagal: Timeout (15 detik)');
+      alert('❌ Upload gagal: Timeout (10 detik) - Cek Apps Script Execution Logs');
       resolve();
-    }, 15000);
+    }, 10000);
 
   }).then(async () => {
-    // Tunggu sebentar lalu reload data
     await sleep(1500);
     await app.loadAllData();
   });

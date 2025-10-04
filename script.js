@@ -351,12 +351,9 @@ async function updateStatusOnServer({sheet,no,which}){
 }
 
 async function uploadFileToDrive({sheet,no,kind,file,inputEl}){
-  if(!file){ 
-    alert('Pilih file terlebih dahulu.'); 
-    return; 
-  }
+  if(!file){ alert('Pilih file terlebih dahulu.'); return; }
 
-  // Dengarkan balasan dari Apps Script (via postMessage)
+  // dengarkan balasan dari GAS (postMessage)
   const onMsg = (ev)=>{
     if (!ev || !ev.data || typeof ev.data !== 'object') return;
     console.log('[GAS upload reply]', ev.data);
@@ -377,13 +374,12 @@ async function uploadFileToDrive({sheet,no,kind,file,inputEl}){
     iframe.style.display = 'none';
 
     const form = document.createElement('form');
-    form.action = GAS_DIRECT_URL;
+    form.action = GAS_DIRECT_URL;          // langsung ke /exec (bukan proxy)
     form.method = 'POST';
     form.enctype = 'multipart/form-data';
     form.target = iframeName;
     form.style.display = 'none';
 
-    // hidden inputs
     const addHidden = (n, v)=>{
       const i = document.createElement('input');
       i.type = 'hidden'; i.name = n; i.value = v;
@@ -394,55 +390,28 @@ async function uploadFileToDrive({sheet,no,kind,file,inputEl}){
     addHidden('no_surat_jalan',no);
     addHidden('kind',kind);
 
-    // Input file untuk form
-    let usingTempInput = true;
-    const tempFileInput = document.createElement('input');
-    tempFileInput.type = 'file';
-    tempFileInput.name = 'file';
-    tempFileInput.accept = inputEl.accept || '.jpg,.jpeg,.png,.pdf';
-    form.appendChild(tempFileInput);
+    // --- kunci stabilitas: pindahkan input asli ke <form> ---
+    const placeholder = document.createElement('span');
+    inputEl.parentElement.replaceChild(placeholder, inputEl); // ambil dari UI
+    inputEl.name = 'file';                                    // WAJIB agar GAS -> e.files.file
+    form.appendChild(inputEl);
 
-    try {
-      // Isi file via DataTransfer
-      const dt = new DataTransfer();
-      dt.items.add(file);
-      tempFileInput.files = dt.files;
-    } catch (e) {
-      // Fallback: pindahkan input asli
-      usingTempInput = false;
-      tempFileInput.remove();
-      inputEl.name = 'file';
-      form.appendChild(inputEl);
-    }
-
-    // Cleanup aman
     const cleanup = ()=>{
       if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
       if (form.parentNode) form.parentNode.removeChild(form);
 
-      // Kalau input asli dipindah, balikin lagi
-      if (!usingTempInput) {
-        const newInput = document.createElement('input');
-        newInput.type = 'file';
-        newInput.className = 'file-input';
-        newInput.accept = inputEl.accept || '.jpg,.jpeg,.png,.pdf';
-        if (inputEl.dataset.sj) newInput.dataset.sj = inputEl.dataset.sj;
-        if (inputEl.dataset.foto) newInput.dataset.foto = inputEl.dataset.foto;
-        const parent = inputEl.parentElement || document.body;
-        parent.replaceChild(newInput, inputEl);
-      }
+      // kembalikan input ke UI agar user bisa pilih file lagi
+      const newInput = document.createElement('input');
+      newInput.type = 'file';
+      newInput.className = 'file-input';
+      newInput.accept = inputEl.accept || '.jpg,.jpeg,.png,.pdf';
+      if (inputEl.dataset.sj)   newInput.dataset.sj   = inputEl.dataset.sj;
+      if (inputEl.dataset.foto) newInput.dataset.foto = inputEl.dataset.foto;
+      placeholder.replaceWith(newInput);
     };
 
-    iframe.addEventListener('load', ()=>{
-      cleanup();
-      resolve();
-    }, { once:true });
-
-    // Safety net: kalau iframe load tidak pernah jalan
-    setTimeout(()=>{
-      cleanup();
-      resolve();
-    }, 15000);
+    iframe.addEventListener('load', ()=>{ cleanup(); resolve(); }, { once:true });
+    setTimeout(()=>{ cleanup(); resolve(); }, 15000); // safety-net
 
     document.body.appendChild(iframe);
     document.body.appendChild(form);
@@ -450,10 +419,10 @@ async function uploadFileToDrive({sheet,no,kind,file,inputEl}){
     form.submit();
   });
 
-  // jeda agar sheet sempat update
-  await sleep(700);
+  await sleep(700);      // beri waktu sheet update
   await app.loadAllData();
 }
+
 
 
 // Expose

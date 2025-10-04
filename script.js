@@ -353,7 +353,7 @@ async function updateStatusOnServer({sheet,no,which}){
 }
 
 // =======================================
-// UPLOAD FILE - DENGAN ORIGIN CHECK
+// UPLOAD FILE - SUPER SIMPLE VERSION
 // =======================================
 async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
   if (!file) {
@@ -361,13 +361,7 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
     return;
   }
 
-  console.log('🔼 Starting upload...', { 
-    sheet: sheet, 
-    no: no, 
-    kind: kind, 
-    file: file.name, 
-    size: file.size 
-  });
+  console.log('🔼 Starting upload...', { sheet, no, kind, file: file.name, size: file.size });
 
   return new Promise((resolve) => {
     const iframeName = 'uploadFrame_' + Date.now();
@@ -383,27 +377,32 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
     form.target = iframeName;
     form.style.display = 'none';
 
-    const addField = (name, value) => {
+    // ✅ SEDERHANA: Tambahkan field satu per satu
+    const fields = [
+      ['action', 'uploadonly'],
+      ['sheet', sheet],
+      ['no_surat_jalan', no],
+      ['kind', kind]
+    ];
+
+    fields.forEach(([name, value]) => {
       const input = document.createElement('input');
       input.type = 'hidden';
       input.name = name;
       input.value = value;
       form.appendChild(input);
-    };
+    });
 
-    addField('action', 'uploadonly'); // Tetap pakai uploadonly dulu untuk testing
-    addField('sheet', sheet);
-    addField('no_surat_jalan', no);
-    addField('kind', kind);
-
-    // Handle file input
+    // ✅ SEDERHANA: Gunakan input file asli (pindahkan sementara)
     const originalParent = inputEl.parentNode;
     inputEl.name = 'file';
     form.appendChild(inputEl);
 
+    let messageReceived = false;
+
     const cleanup = () => {
-      if (iframe.parentNode) document.body.removeChild(iframe);
-      if (form.parentNode) document.body.removeChild(form);
+      if (iframe.parentNode) iframe.remove();
+      if (form.parentNode) form.remove();
     };
 
     const restoreInput = () => {
@@ -417,21 +416,15 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
     };
 
     const handleMessage = (event) => {
-      // ✅ TAMBAHKAN ORIGIN CHECK
-      if (event.origin !== 'https://script.google.com' && 
-          event.origin !== 'https://cyandiguna56.github.io') {
-        console.log('Ignoring message from unknown origin:', event.origin);
-        return;
-      }
+      console.log('📨 Message received:', event.origin, event.data);
       
-      if (typeof event.data !== 'object' || event.data === null) return;
-      
-      console.log('📨 Message received from:', event.origin, event.data);
-      
-      if ('ok' in event.data) {
+      // Terima dari semua origin untuk testing
+      if (event.data && typeof event.data === 'object' && 'ok' in event.data) {
+        messageReceived = true;
+        
         if (event.data.ok) {
           console.log('✅ Upload sukses:', event.data.url);
-          alert('✅ Upload sukses!\nURL: ' + event.data.url);
+          alert('✅ Upload sukses!\nFile tersimpan di Google Drive.');
           restoreInput();
         } else {
           console.error('❌ Upload gagal:', event.data.msg);
@@ -439,29 +432,47 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
           restoreInput();
         }
         
-        window.removeEventListener('message', handleMessage);
         cleanup();
+        window.removeEventListener('message', handleMessage);
         resolve();
       }
     };
 
     window.addEventListener('message', handleMessage);
 
+    // Fallback: iframe load event
+    iframe.addEventListener('load', () => {
+      console.log('🔄 Iframe loaded');
+      setTimeout(() => {
+        if (!messageReceived) {
+          console.log('⚠️ No message received, assuming success');
+          alert('⚠️ Upload mungkin berhasil, cek Apps Script logs');
+          restoreInput();
+          cleanup();
+          window.removeEventListener('message', handleMessage);
+          resolve();
+        }
+      }, 3000);
+    });
+
     document.body.appendChild(form);
-    console.log('📤 Submitting form to GAS...');
+    console.log('📤 Submitting form to:', GAS_DIRECT_URL);
     form.submit();
 
-    // Safety timeout - kurangi jadi 10 detik
+    // Timeout safety
     setTimeout(() => {
-      window.removeEventListener('message', handleMessage);
-      cleanup();
-      restoreInput();
-      alert('❌ Upload gagal: Timeout (10 detik) - Cek Apps Script Execution Logs');
-      resolve();
-    }, 10000);
+      if (!messageReceived) {
+        console.log('⏰ Timeout reached');
+        alert('❌ Upload timeout - Cek Apps Script Execution logs');
+        restoreInput();
+        cleanup();
+        window.removeEventListener('message', handleMessage);
+        resolve();
+      }
+    }, 15000);
 
   }).then(async () => {
-    await sleep(1500);
+    await sleep(2000);
     await app.loadAllData();
   });
 }

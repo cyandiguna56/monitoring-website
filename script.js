@@ -2,7 +2,8 @@
 // KONFIGURASI
 // =======================================
 const SCRIPT_URL = 'https://cors-proxy-apps-script.cyandiguna56.workers.dev/';
-const GAS_DIRECT_URL = 'https://script.googleusercontent.com/macros/echo?user_content_key=AehSKLguVjjg0vx4zw7EBxIdVvW9DAtkfjdUB9gCI-i9sEz6MBM57YepkzcFgqMBD2-LjgEY7DQFrl6aNUj1EXiIxLCBHNIapjLUKGkjD6GO1tRM59wyis8HEShH4ixPjjArxE9lhP50HXRDE5GvvIi8KTUt50dg8nXqyOqJC1JaBZW1h1Wf4N3Yz9UqntLjR5kqS1rDFfS029IRAC9kZrEgAgBqspnpJluoSdSGZXBkSSKlcMGDlPnuKlQP7z5S-Cr0DyKB-oE6jLY2S05b8v4WcDmZcXIWtN3deXxscr_E&lib=MFMnwREcxC5mYD-2uaksV3dQSj6r8oaPZ';
+const GAS_DIRECT_URL =
+  'https://script.googleusercontent.com/macros/echo?user_content_key=AehSKLieWI9mLIYPEuz8hdkYypJPReuNeAx9a4yBO1P-ktL10t_ctqRZyKBjPFTUDgCwsWgAPvdQy1RhPaj98I_oRgcEJE35ZIDghdNyeSYBseqrG8t2fQlZMTcsgdRW4eanop-ZOzth0IyybSsNnLV4b-9RqeBPtbGH5F4wC2G8QD9l3szpgzj3Uq48iTbpC1GBpK1q23zbLdNl1HF6cxY1-t7fY0Y-sSUInEIIMJ9ea1_conI-ecGedoHncGwQsoJrSwn0HZqRwn2jWKhLuWePpK9KLmliWeLFHjfWWYDe&lib=MFMnwREcxC5mYD-2uaksV3dQSj6r8oaPZ;
 const SHEETS = ['MONITORING PISANG','MONITORING LOKAL','MONITORING FMCG','MONITORING IMPORT'];
 
 // =======================================
@@ -124,7 +125,6 @@ class MonitoringSystem{
   }
 
   async fetchSheet(sheetName){
-    // PENTING: pakai action=readSheet
     const url = `${SCRIPT_URL}?action=readSheet&sheet=${encodeURIComponent(sheetName)}`;
     const ctrl=new AbortController(); const to=setTimeout(()=>ctrl.abort(),20000);
     const res=await fetch(url,{signal:ctrl.signal}); clearTimeout(to);
@@ -346,87 +346,58 @@ async function updateStatusOnServer({sheet,no,which}){
   const getUrl = `${SCRIPT_URL}?action=updateStatus&sheet=${encodeURIComponent(sheet)}&no_surat_jalan=${encodeURIComponent(no)}&which=${encodeURIComponent(which)}`;
   try{ const r=await fetch(getUrl,{method:'GET'}); if(r.ok) return; }catch(_){}
   const fd=new FormData();
-  fd.append('action','updateStatus');
-  fd.append('sheet',sheet);
-  fd.append('no_surat_jalan',no);
-  fd.append('which',which);
+  fd.append('action','updateStatus'); fd.append('sheet',sheet);
+  fd.append('no_surat_jalan',no);     fd.append('which',which);
   const res=await fetch(SCRIPT_URL,{method:'POST',body:fd});
-  if(!res.ok){
-    console.warn('POST updateStatus gagal, status:',res.status);
-    alert('Gagal mengirim perintah ke server (updateStatus).');
-  }
+  if(!res.ok){ console.warn('POST updateStatus gagal, status:',res.status); alert('Gagal mengirim perintah ke server (updateStatus).'); }
 }
-
-// ==== GANTI dgn URL googleusercontent MILIKMU ====
-const GAS_DIRECT_URL =
-  'https://script.googleusercontent.com/macros/echo?user_content_key=AehSKLguVjjg0vx4zw7EBxIdVvW9DAtkfjdUB9gCI-i9sEz6MBM57YepkzcFgqMBD2-LjgEY7DQFrl6aNUj1EXiIxLCBHNIapjLUKGkjD6GO1tRM59wyis8HEShH4ixPjjArxE9lhP50HXRDE5GvvIi8KTUt50dg8nXqyOqJC1JaBZW1h1Wf4N3Yz9UqntLjR5kqS1rDFfS029IRAC9kZrEgAgBqspnpJluoSdSGZXBkSSKlcMGDlPnuKlQP7z5S-Cr0DyKB-oE6jLY2S05b8v4WcDmZcXIWtN3deXxscr_E&lib=MFMnwREcxC5mYD-2uaksV3dQSj6r8oaPZ';
 
 async function uploadFileToDrive({sheet,no,kind,file,inputEl}){
   if(!file || !inputEl){ alert('Pilih file terlebih dahulu.'); return; }
 
-  // Dengarkan balasan dari Apps Script (via postMessage)
+  // balasan dari Apps Script via postMessage
   const onMsg = (ev)=>{
     if (!ev || !ev.data || typeof ev.data !== 'object') return;
     console.log('[GAS upload reply]', ev.data);
-    if (ev.data.ok) {
-      alert('Upload sukses!\n' + (ev.data.url || ''));
-    } else {
-      alert('Upload gagal: ' + (ev.data.msg || 'Unknown'));
-    }
+    if (ev.data.ok) alert('Upload sukses!\n' + (ev.data.url || ''));
+    else alert('Upload gagal: ' + (ev.data.msg || 'Unknown'));
   };
   window.addEventListener('message', onMsg, { once:true });
 
   await new Promise((resolve)=>{
     const iframeName = `uploadFrame_${Date.now()}`;
-    const iframe = document.createElement('iframe');
-    iframe.name = iframeName;
-    iframe.style.display = 'none';
+    const iframe = document.createElement('iframe'); iframe.name = iframeName; iframe.style.display='none';
 
     const form = document.createElement('form');
-    form.action = GAS_DIRECT_URL;
-    form.method = 'POST';
-    form.enctype = 'multipart/form-data';
-    form.target = iframeName;
-    form.style.display = 'none';
+    form.action = GAS_DIRECT_URL; form.method='POST'; form.enctype='multipart/form-data';
+    form.target = iframeName; form.style.display='none';
 
-    // Hidden inputs
-    const addHidden = (n, v)=>{
-      const i = document.createElement('input');
-      i.type = 'hidden'; i.name = n; i.value = v;
-      form.appendChild(i);
-    };
+    const addHidden = (n,v)=>{ const i=document.createElement('input'); i.type='hidden'; i.name=n; i.value=v; form.appendChild(i); };
     addHidden('action','uploadimage');
     addHidden('sheet',sheet);
     addHidden('no_surat_jalan',no);
     addHidden('kind',kind);
 
-    // === KUNCI STABILITAS: pindahkan input asli ke form ===
+    // pindah input asli ke form agar semua browser kompatibel
     const placeholder = document.createElement('span');
     inputEl.parentElement.replaceChild(placeholder, inputEl);
     inputEl.name = 'file';
     form.appendChild(inputEl);
 
-    // Cleanup: kembalikan input baru ke UI + bersihkan DOM
     const cleanup = ()=>{
       if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
-      if (form.parentNode) form.parentNode.removeChild(form);
-
+      if (form.parentNode)   form.parentNode.removeChild(form);
+      // balikin input baru ke UI
       const newInput = document.createElement('input');
-      newInput.type = 'file';
-      newInput.className = 'file-input';
+      newInput.type='file'; newInput.className='file-input';
       newInput.accept = inputEl.accept || '.jpg,.jpeg,.png,.pdf';
       if (inputEl.dataset.sj)   newInput.dataset.sj   = inputEl.dataset.sj;
       if (inputEl.dataset.foto) newInput.dataset.foto = inputEl.dataset.foto;
       placeholder.replaceWith(newInput);
     };
 
-    iframe.addEventListener('load', ()=>{
-      cleanup();
-      resolve();
-    }, { once:true });
-
-    // Safety net 15s
-    setTimeout(()=>{ cleanup(); resolve(); }, 15000);
+    iframe.addEventListener('load', ()=>{ cleanup(); resolve(); }, { once:true });
+    setTimeout(()=>{ cleanup(); resolve(); }, 15000); // safety-net
 
     document.body.appendChild(iframe);
     document.body.appendChild(form);
@@ -437,3 +408,6 @@ async function uploadFileToDrive({sheet,no,kind,file,inputEl}){
   await sleep(800);
   await app.loadAllData();
 }
+
+// Expose class
+window.MonitoringSystem = MonitoringSystem;

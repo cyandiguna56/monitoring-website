@@ -2,7 +2,7 @@
 // KONFIGURASI
 // =======================================
 const SCRIPT_URL = 'https://cors-proxy-apps-script.cyandiguna56.workers.dev/';
-const GAS_DIRECT_URL = 'https://script.googleusercontent.com/macros/echo?user_content_key=AehSKLghpj7b4iO5itvTY_DeavBHTt-zP0_F2FNPYuZMiydsTI5GZ_BPEw9y_uCuobV6qNvBkr5AuC9pLBTKEpdFUZVNxl3yzhciRPRFuvnQI6JPJQaV-omHqo8MSQA7xKQt_FWhrU0wQDgro3Kkhq_oSROpDFzTvWxiqGh72f7Gr11hjo4_ytPhT9HcSJS4JtGkeS43-DM_SCLbOLD8NKyrSSD5_7codox3UAnsoo_RpAPwd_z0PcARdKOw10ipBFk2qkz_9K1mvsc_gsADtDyw3eqgCsb8WKO_h09aVySf&lib=MFMnwREcxC5mYD-2uaksV3dQSj6r8oaPZ';
+const GAS_DIRECT_URL = 'https://script.googleusercontent.com/macros/echo?user_content_key=AehSKLguVjjg0vx4zw7EBxIdVvW9DAtkfjdUB9gCI-i9sEz6MBM57YepkzcFgqMBD2-LjgEY7DQFrl6aNUj1EXiIxLCBHNIapjLUKGkjD6GO1tRM59wyis8HEShH4ixPjjArxE9lhP50HXRDE5GvvIi8KTUt50dg8nXqyOqJC1JaBZW1h1Wf4N3Yz9UqntLjR5kqS1rDFfS029IRAC9kZrEgAgBqspnpJluoSdSGZXBkSSKlcMGDlPnuKlQP7z5S-Cr0DyKB-oE6jLY2S05b8v4WcDmZcXIWtN3deXxscr_E&lib=MFMnwREcxC5mYD-2uaksV3dQSj6r8oaPZ';
 const SHEETS = ['MONITORING PISANG','MONITORING LOKAL','MONITORING FMCG','MONITORING IMPORT'];
 
 // =======================================
@@ -340,28 +340,37 @@ class MonitoringSystem{
 }
 
 // =======================================
-// SERVER CALLS
+// SERVER CALLS (FINAL)
 // =======================================
 async function updateStatusOnServer({sheet,no,which}){
   const getUrl = `${SCRIPT_URL}?action=updateStatus&sheet=${encodeURIComponent(sheet)}&no_surat_jalan=${encodeURIComponent(no)}&which=${encodeURIComponent(which)}`;
   try{ const r=await fetch(getUrl,{method:'GET'}); if(r.ok) return; }catch(_){}
-  const fd=new FormData(); fd.append('action','updateStatus'); fd.append('sheet',sheet); fd.append('no_surat_jalan',no); fd.append('which',which);
+  const fd=new FormData();
+  fd.append('action','updateStatus');
+  fd.append('sheet',sheet);
+  fd.append('no_surat_jalan',no);
+  fd.append('which',which);
   const res=await fetch(SCRIPT_URL,{method:'POST',body:fd});
-  if(!res.ok){ console.warn('POST updateStatus gagal, status:',res.status); alert('Gagal mengirim perintah ke server (updateStatus).'); }
+  if(!res.ok){
+    console.warn('POST updateStatus gagal, status:',res.status);
+    alert('Gagal mengirim perintah ke server (updateStatus).');
+  }
 }
 
-async function uploadFileToDrive({sheet,no,kind,file,inputEl}){
-  if(!file){ alert('Pilih file terlebih dahulu.'); return; }
+// ==== GANTI dgn URL googleusercontent MILIKMU ====
+const GAS_DIRECT_URL =
+  'https://script.googleusercontent.com/macros/echo?user_content_key=AehSKLguVjjg0vx4zw7EBxIdVvW9DAtkfjdUB9gCI-i9sEz6MBM57YepkzcFgqMBD2-LjgEY7DQFrl6aNUj1EXiIxLCBHNIapjLUKGkjD6GO1tRM59wyis8HEShH4ixPjjArxE9lhP50HXRDE5GvvIi8KTUt50dg8nXqyOqJC1JaBZW1h1Wf4N3Yz9UqntLjR5kqS1rDFfS029IRAC9kZrEgAgBqspnpJluoSdSGZXBkSSKlcMGDlPnuKlQP7z5S-Cr0DyKB-oE6jLY2S05b8v4WcDmZcXIWtN3deXxscr_E&lib=MFMnwREcxC5mYD-2uaksV3dQSj6r8oaPZ';
 
-  // dengarkan balasan dari GAS (postMessage)
+async function uploadFileToDrive({sheet,no,kind,file,inputEl}){
+  if(!file || !inputEl){ alert('Pilih file terlebih dahulu.'); return; }
+
+  // Dengarkan balasan dari Apps Script (via postMessage)
   const onMsg = (ev)=>{
     if (!ev || !ev.data || typeof ev.data !== 'object') return;
     console.log('[GAS upload reply]', ev.data);
     if (ev.data.ok) {
-      console.info('✅ Upload sukses:', ev.data.url);
-      alert('Upload sukses!\n' + ev.data.url);
+      alert('Upload sukses!\n' + (ev.data.url || ''));
     } else {
-      console.error('⚠️ Upload gagal:', ev.data);
       alert('Upload gagal: ' + (ev.data.msg || 'Unknown'));
     }
   };
@@ -374,12 +383,13 @@ async function uploadFileToDrive({sheet,no,kind,file,inputEl}){
     iframe.style.display = 'none';
 
     const form = document.createElement('form');
-    form.action = GAS_DIRECT_URL;          // langsung ke /exec (bukan proxy)
+    form.action = GAS_DIRECT_URL;
     form.method = 'POST';
     form.enctype = 'multipart/form-data';
     form.target = iframeName;
     form.style.display = 'none';
 
+    // Hidden inputs
     const addHidden = (n, v)=>{
       const i = document.createElement('input');
       i.type = 'hidden'; i.name = n; i.value = v;
@@ -390,17 +400,17 @@ async function uploadFileToDrive({sheet,no,kind,file,inputEl}){
     addHidden('no_surat_jalan',no);
     addHidden('kind',kind);
 
-    // --- kunci stabilitas: pindahkan input asli ke <form> ---
+    // === KUNCI STABILITAS: pindahkan input asli ke form ===
     const placeholder = document.createElement('span');
-    inputEl.parentElement.replaceChild(placeholder, inputEl); // ambil dari UI
-    inputEl.name = 'file';                                    // WAJIB agar GAS -> e.files.file
+    inputEl.parentElement.replaceChild(placeholder, inputEl);
+    inputEl.name = 'file';
     form.appendChild(inputEl);
 
+    // Cleanup: kembalikan input baru ke UI + bersihkan DOM
     const cleanup = ()=>{
       if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
       if (form.parentNode) form.parentNode.removeChild(form);
 
-      // kembalikan input ke UI agar user bisa pilih file lagi
       const newInput = document.createElement('input');
       newInput.type = 'file';
       newInput.className = 'file-input';
@@ -410,8 +420,13 @@ async function uploadFileToDrive({sheet,no,kind,file,inputEl}){
       placeholder.replaceWith(newInput);
     };
 
-    iframe.addEventListener('load', ()=>{ cleanup(); resolve(); }, { once:true });
-    setTimeout(()=>{ cleanup(); resolve(); }, 15000); // safety-net
+    iframe.addEventListener('load', ()=>{
+      cleanup();
+      resolve();
+    }, { once:true });
+
+    // Safety net 15s
+    setTimeout(()=>{ cleanup(); resolve(); }, 15000);
 
     document.body.appendChild(iframe);
     document.body.appendChild(form);
@@ -419,11 +434,6 @@ async function uploadFileToDrive({sheet,no,kind,file,inputEl}){
     form.submit();
   });
 
-  await sleep(700);      // beri waktu sheet update
+  await sleep(800);
   await app.loadAllData();
 }
-
-
-
-// Expose
-window.MonitoringSystem=MonitoringSystem;

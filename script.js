@@ -351,9 +351,12 @@ async function updateStatusOnServer({sheet,no,which}){
 }
 
 async function uploadFileToDrive({sheet,no,kind,file,inputEl}){
-  if(!file){ alert('Pilih file terlebih dahulu.'); return; }
+  if(!file){ 
+    alert('Pilih file terlebih dahulu.'); 
+    return; 
+  }
 
-  // Terima balasan dari GAS (postMessage dari doPost)
+  // Dengarkan balasan dari Apps Script (via postMessage)
   const onMsg = (ev)=>{
     if (!ev || !ev.data || typeof ev.data !== 'object') return;
     console.log('[GAS upload reply]', ev.data);
@@ -361,7 +364,7 @@ async function uploadFileToDrive({sheet,no,kind,file,inputEl}){
       console.info('✅ Upload sukses:', ev.data.url);
       alert('Upload sukses!\n' + ev.data.url);
     } else {
-      console.error('Upload error detail:', ev.data);
+      console.error('⚠️ Upload gagal:', ev.data);
       alert('Upload gagal: ' + (ev.data.msg || 'Unknown'));
     }
   };
@@ -380,17 +383,18 @@ async function uploadFileToDrive({sheet,no,kind,file,inputEl}){
     form.target = iframeName;
     form.style.display = 'none';
 
-    const addHidden = (n, v) => {
+    // hidden inputs
+    const addHidden = (n, v)=>{
       const i = document.createElement('input');
       i.type = 'hidden'; i.name = n; i.value = v;
       form.appendChild(i);
     };
     addHidden('action','uploadimage');
-    addHidden('sheet', sheet);
-    addHidden('no_surat_jalan', no);
-    addHidden('kind', kind);
+    addHidden('sheet',sheet);
+    addHidden('no_surat_jalan',no);
+    addHidden('kind',kind);
 
-    // Siapkan input file untuk form
+    // Input file untuk form
     let usingTempInput = true;
     const tempFileInput = document.createElement('input');
     tempFileInput.type = 'file';
@@ -399,61 +403,57 @@ async function uploadFileToDrive({sheet,no,kind,file,inputEl}){
     form.appendChild(tempFileInput);
 
     try {
-      // Utama: isi file via DataTransfer
+      // Isi file via DataTransfer
       const dt = new DataTransfer();
       dt.items.add(file);
       tempFileInput.files = dt.files;
     } catch (e) {
-      // Fallback: pindahkan input asli ke form
+      // Fallback: pindahkan input asli
       usingTempInput = false;
       tempFileInput.remove();
       inputEl.name = 'file';
       form.appendChild(inputEl);
     }
 
-    // Cleanup aman: sekali saja + cek parentNode
+    // Cleanup aman
     const cleanup = ()=>{
       if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
       if (form.parentNode) form.parentNode.removeChild(form);
 
-      // Kalau tadi memindahkan input asli, kembalikan ke tempatnya
+      // Kalau input asli dipindah, balikin lagi
       if (!usingTempInput) {
-        // Buat pengganti baru agar UI tetap punya file input
         const newInput = document.createElement('input');
         newInput.type = 'file';
         newInput.className = 'file-input';
         newInput.accept = inputEl.accept || '.jpg,.jpeg,.png,.pdf';
         if (inputEl.dataset.sj) newInput.dataset.sj = inputEl.dataset.sj;
         if (inputEl.dataset.foto) newInput.dataset.foto = inputEl.dataset.foto;
-        // letakkan di tempat inputEl semula
         const parent = inputEl.parentElement || document.body;
         parent.replaceChild(newInput, inputEl);
       }
     };
 
-    // Penting: jalankan sekali saja
     iframe.addEventListener('load', ()=>{
       cleanup();
       resolve();
     }, { once:true });
 
-    // Safety net: kalau onload tidak pernah terpanggil (sangat jarang)
-    const failSafe = setTimeout(()=>{
+    // Safety net: kalau iframe load tidak pernah jalan
+    setTimeout(()=>{
       cleanup();
       resolve();
     }, 15000);
 
     document.body.appendChild(iframe);
     document.body.appendChild(form);
-    console.log('🔼 Submit upload form → GAS', { sheet, no, kind });
+    console.log('🔼 Submit upload form → GAS',{sheet,no,kind});
     form.submit();
   });
 
-  // beri jeda kecil agar sheet sempat ter-update
+  // jeda agar sheet sempat update
   await sleep(700);
   await app.loadAllData();
 }
-
 
 
 // Expose

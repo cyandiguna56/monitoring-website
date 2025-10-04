@@ -353,7 +353,7 @@ async function updateStatusOnServer({sheet,no,which}){
 async function uploadFileToDrive({sheet,no,kind,file,inputEl}){
   if(!file){ alert('Pilih file terlebih dahulu.'); return; }
 
-  // Dengarkan hasil dari GAS (HTML balas dengan postMessage)
+  // Terima balasan dari GAS (postMessage dari doPost)
   const onMsg = (ev)=>{
     if (!ev || !ev.data || typeof ev.data !== 'object') return;
     console.log('[GAS upload reply]', ev.data);
@@ -361,55 +361,91 @@ async function uploadFileToDrive({sheet,no,kind,file,inputEl}){
       console.info('✅ Upload sukses:', ev.data.url);
       alert('Upload sukses!\n' + ev.data.url);
     } else {
+      console.error('Upload error detail:', ev.data);
       alert('Upload gagal: ' + (ev.data.msg || 'Unknown'));
     }
   };
   window.addEventListener('message', onMsg, { once:true });
 
   await new Promise((resolve)=>{
-    const iframeName=`uploadFrame_${Date.now()}`;
-    const iframe=document.createElement('iframe');
-    iframe.name=iframeName; iframe.style.display='none';
+    const iframeName = `uploadFrame_${Date.now()}`;
+    const iframe = document.createElement('iframe');
+    iframe.name = iframeName;
+    iframe.style.display = 'none';
 
-    const form=document.createElement('form');
-    form.action=GAS_DIRECT_URL;
-    form.method='POST';
-    form.enctype='multipart/form-data';
-    form.target=iframeName;
-    form.style.display='none';
+    const form = document.createElement('form');
+    form.action = GAS_DIRECT_URL;
+    form.method = 'POST';
+    form.enctype = 'multipart/form-data';
+    form.target = iframeName;
+    form.style.display = 'none';
 
-    const addHidden=(n,v)=>{
-      const i=document.createElement('input');
-      i.type='hidden'; i.name=n; i.value=v;
+    const addHidden = (n, v) => {
+      const i = document.createElement('input');
+      i.type = 'hidden'; i.name = n; i.value = v;
       form.appendChild(i);
     };
     addHidden('action','uploadimage');
-    addHidden('sheet',sheet);
-    addHidden('no_surat_jalan',no);
-    addHidden('kind',kind);
+    addHidden('sheet', sheet);
+    addHidden('no_surat_jalan', no);
+    addHidden('kind', kind);
 
-    // Input file baru di dalam form
-    const fileInput=document.createElement('input');
-    fileInput.type='file';
-    fileInput.name='file';
-    fileInput.accept = inputEl.accept || '.jpg,.jpeg,.png,.pdf';
-    form.appendChild(fileInput);
+    // Siapkan input file untuk form
+    let usingTempInput = true;
+    const tempFileInput = document.createElement('input');
+    tempFileInput.type = 'file';
+    tempFileInput.name = 'file';
+    tempFileInput.accept = inputEl.accept || '.jpg,.jpeg,.png,.pdf';
+    form.appendChild(tempFileInput);
 
-    // Isi file via DataTransfer
-    const dt=new DataTransfer();
-    dt.items.add(file);
-    fileInput.files=dt.files;
+    try {
+      // Utama: isi file via DataTransfer
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      tempFileInput.files = dt.files;
+    } catch (e) {
+      // Fallback: pindahkan input asli ke form
+      usingTempInput = false;
+      tempFileInput.remove();
+      inputEl.name = 'file';
+      form.appendChild(inputEl);
+    }
 
-    iframe.addEventListener('load',()=>{
-      // load ≠ sukses upload, tapi aman untuk bersih-bersih DOM
-      document.body.removeChild(iframe);
-      document.body.removeChild(form);
+    // Cleanup aman: sekali saja + cek parentNode
+    const cleanup = ()=>{
+      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+      if (form.parentNode) form.parentNode.removeChild(form);
+
+      // Kalau tadi memindahkan input asli, kembalikan ke tempatnya
+      if (!usingTempInput) {
+        // Buat pengganti baru agar UI tetap punya file input
+        const newInput = document.createElement('input');
+        newInput.type = 'file';
+        newInput.className = 'file-input';
+        newInput.accept = inputEl.accept || '.jpg,.jpeg,.png,.pdf';
+        if (inputEl.dataset.sj) newInput.dataset.sj = inputEl.dataset.sj;
+        if (inputEl.dataset.foto) newInput.dataset.foto = inputEl.dataset.foto;
+        // letakkan di tempat inputEl semula
+        const parent = inputEl.parentElement || document.body;
+        parent.replaceChild(newInput, inputEl);
+      }
+    };
+
+    // Penting: jalankan sekali saja
+    iframe.addEventListener('load', ()=>{
+      cleanup();
       resolve();
-    });
+    }, { once:true });
+
+    // Safety net: kalau onload tidak pernah terpanggil (sangat jarang)
+    const failSafe = setTimeout(()=>{
+      cleanup();
+      resolve();
+    }, 15000);
 
     document.body.appendChild(iframe);
     document.body.appendChild(form);
-    console.log('🔼 Submit upload form → GAS',{sheet,no,kind});
+    console.log('🔼 Submit upload form → GAS', { sheet, no, kind });
     form.submit();
   });
 
@@ -417,6 +453,7 @@ async function uploadFileToDrive({sheet,no,kind,file,inputEl}){
   await sleep(700);
   await app.loadAllData();
 }
+
 
 
 // Expose

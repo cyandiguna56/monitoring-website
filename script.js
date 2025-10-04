@@ -351,52 +351,73 @@ async function updateStatusOnServer({sheet,no,which}){
 }
 
 async function uploadFileToDrive({sheet,no,kind,file,inputEl}){
-  if(!file || !inputEl || !(inputEl instanceof HTMLInputElement)){ alert('Pilih file terlebih dahulu.'); return; }
-  inputEl.name='file';
+  if(!file){ alert('Pilih file terlebih dahulu.'); return; }
 
-  const onMsg=(ev)=>{
-    if(ev && ev.data && typeof ev.data==='object'){
-      console.log('[GAS upload reply]',ev.data);
-      if(ev.data.ok) console.info('✅ Upload sukses:',ev.data.url);
-      else { console.warn('⚠️ Upload gagal:',ev.data.msg); alert('Upload gagal: '+(ev.data.msg||'Unknown')); }
+  // Dengarkan hasil dari GAS (HTML balas dengan postMessage)
+  const onMsg = (ev)=>{
+    if (!ev || !ev.data || typeof ev.data !== 'object') return;
+    console.log('[GAS upload reply]', ev.data);
+    if (ev.data.ok) {
+      console.info('✅ Upload sukses:', ev.data.url);
+      alert('Upload sukses!\n' + ev.data.url);
+    } else {
+      alert('Upload gagal: ' + (ev.data.msg || 'Unknown'));
     }
   };
-  window.addEventListener('message',onMsg,{once:true});
+  window.addEventListener('message', onMsg, { once:true });
 
   await new Promise((resolve)=>{
     const iframeName=`uploadFrame_${Date.now()}`;
-    const iframe=document.createElement('iframe'); iframe.name=iframeName; iframe.style.display='none';
-    const form=document.createElement('form');
-    form.action=GAS_DIRECT_URL; form.method='POST'; form.enctype='multipart/form-data'; form.target=iframeName; form.style.display='none';
+    const iframe=document.createElement('iframe');
+    iframe.name=iframeName; iframe.style.display='none';
 
-    const addHidden=(n,v)=>{ const i=document.createElement('input'); i.type='hidden'; i.name=n; i.value=v; form.appendChild(i); };
-    addHidden('action','uploadimage'); // endpoint GAS
+    const form=document.createElement('form');
+    form.action=GAS_DIRECT_URL;
+    form.method='POST';
+    form.enctype='multipart/form-data';
+    form.target=iframeName;
+    form.style.display='none';
+
+    const addHidden=(n,v)=>{
+      const i=document.createElement('input');
+      i.type='hidden'; i.name=n; i.value=v;
+      form.appendChild(i);
+    };
+    addHidden('action','uploadimage');
     addHidden('sheet',sheet);
     addHidden('no_surat_jalan',no);
-    addHidden('kind',kind);            // SURAT_JALAN | FOTO_UNIT
+    addHidden('kind',kind);
 
-    const parent=inputEl.parentElement; const placeholder=document.createElement('span');
-    parent.replaceChild(placeholder,inputEl); form.appendChild(inputEl);
+    // Input file baru di dalam form
+    const fileInput=document.createElement('input');
+    fileInput.type='file';
+    fileInput.name='file';
+    fileInput.accept = inputEl.accept || '.jpg,.jpeg,.png,.pdf';
+    form.appendChild(fileInput);
+
+    // Isi file via DataTransfer
+    const dt=new DataTransfer();
+    dt.items.add(file);
+    fileInput.files=dt.files;
 
     iframe.addEventListener('load',()=>{
-      document.body.removeChild(iframe); document.body.removeChild(form);
-      const newInput=document.createElement('input');
-      newInput.type='file'; newInput.className='file-input';
-      newInput.accept=inputEl.accept||'.jpg,.jpeg,.png,.pdf';
-      if(inputEl.dataset.sj) newInput.dataset.sj=inputEl.dataset.sj;
-      if(inputEl.dataset.foto) newInput.dataset.foto=inputEl.dataset.foto;
-      placeholder.replaceWith(newInput);
+      // load ≠ sukses upload, tapi aman untuk bersih-bersih DOM
+      document.body.removeChild(iframe);
+      document.body.removeChild(form);
       resolve();
     });
 
-    document.body.appendChild(iframe); document.body.appendChild(form);
+    document.body.appendChild(iframe);
+    document.body.appendChild(form);
     console.log('🔼 Submit upload form → GAS',{sheet,no,kind});
     form.submit();
   });
 
+  // beri jeda kecil agar sheet sempat ter-update
   await sleep(700);
   await app.loadAllData();
 }
+
 
 // Expose
 window.MonitoringSystem=MonitoringSystem;

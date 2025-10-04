@@ -352,62 +352,79 @@ async function updateStatusOnServer({sheet,no,which}){
   if(!res.ok){ console.warn('POST updateStatus gagal, status:',res.status); alert('Gagal mengirim perintah ke server (updateStatus).'); }
 }
 
-async function uploadFileToDrive({sheet,no,kind,file,inputEl}){
-  if(!file || !inputEl){ alert('Pilih file terlebih dahulu.'); return; }
+// =======================================
+// UPLOAD FILE - VERSION SUPER SIMPLE
+// =======================================
+async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
+  if (!file) {
+    alert('Pilih file terlebih dahulu.');
+    return;
+  }
 
-  // balasan dari Apps Script via postMessage
-  const onMsg = (ev)=>{
-    if (!ev || !ev.data || typeof ev.data !== 'object') return;
-    console.log('[GAS upload reply]', ev.data);
-    if (ev.data.ok) alert('Upload sukses!\n' + (ev.data.url || ''));
-    else alert('Upload gagal: ' + (ev.data.msg || 'Unknown'));
-  };
-  window.addEventListener('message', onMsg, { once:true });
+  console.log('🔼 Starting upload...', { sheet, no, kind, file: file.name, size: file.size });
 
-  await new Promise((resolve)=>{
-    const iframeName = `uploadFrame_${Date.now()}`;
-    const iframe = document.createElement('iframe'); iframe.name = iframeName; iframe.style.display='none';
+  try {
+    // ✅ METHOD PALING SIMPLE: Langsung fetch tanpa iframe
+    const formData = new FormData();
+    formData.append('action', 'uploadimage');
+    formData.append('sheet', sheet);
+    formData.append('no_surat_jalan', no);
+    formData.append('kind', kind);
+    formData.append('file', file);
 
-    const form = document.createElement('form');
-    form.action = GAS_DIRECT_URL; form.method='POST'; form.enctype='multipart/form-data';
-    form.target = iframeName; form.style.display='none';
+    console.log('📤 Sending to GAS...');
+    
+    const response = await fetch(GAS_DIRECT_URL, {
+      method: 'POST',
+      body: formData
+    });
 
-    const addHidden = (n,v)=>{ const i=document.createElement('input'); i.type='hidden'; i.name=n; i.value=v; form.appendChild(i); };
-    addHidden('action','uploadimage');
-    addHidden('sheet',sheet);
-    addHidden('no_surat_jalan',no);
-    addHidden('kind',kind);
+    console.log('📥 Response received:', response.status);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
 
-    // pindah input asli ke form agar semua browser kompatibel
-    const placeholder = document.createElement('span');
-    inputEl.parentElement.replaceChild(placeholder, inputEl);
-    inputEl.name = 'file';
-    form.appendChild(inputEl);
+    const text = await response.text();
+    console.log('📄 Response text:', text);
 
-    const cleanup = ()=>{
-      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
-      if (form.parentNode)   form.parentNode.removeChild(form);
-      // balikin input baru ke UI
-      const newInput = document.createElement('input');
-      newInput.type='file'; newInput.className='file-input';
-      newInput.accept = inputEl.accept || '.jpg,.jpeg,.png,.pdf';
-      if (inputEl.dataset.sj)   newInput.dataset.sj   = inputEl.dataset.sj;
-      if (inputEl.dataset.foto) newInput.dataset.foto = inputEl.dataset.foto;
-      placeholder.replaceWith(newInput);
-    };
+    // Parse HTML response untuk dapatkan script tag
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(text, 'text/html');
+    const script = doc.querySelector('script');
+    
+    if (script) {
+      const scriptContent = script.textContent;
+      const match = scriptContent.match(/window\.parent\.postMessage\(({[^}]+}),/);
+      if (match) {
+        const result = JSON.parse(match[1]);
+        console.log('🎯 Upload result:', result);
+        
+        if (result.ok) {
+          alert('✅ Upload sukses!\nFile tersimpan di Drive.');
+          // Reset input file
+          if (inputEl && inputEl.parentNode) {
+            const newInput = inputEl.cloneNode(true);
+            inputEl.parentNode.replaceChild(newInput, inputEl);
+          }
+        } else {
+          alert('❌ Upload gagal: ' + (result.msg || 'Unknown error'));
+        }
+      } else {
+        throw new Error('Tidak bisa parse response dari server');
+      }
+    } else {
+      throw new Error('Format response tidak dikenali');
+    }
 
-    iframe.addEventListener('load', ()=>{ cleanup(); resolve(); }, { once:true });
-    setTimeout(()=>{ cleanup(); resolve(); }, 15000); // safety-net
+  } catch (error) {
+    console.error('💥 Upload error:', error);
+    alert('❌ Upload gagal: ' + error.message);
+  }
 
-    document.body.appendChild(iframe);
-    document.body.appendChild(form);
-    console.log('🔼 Submit upload form → GAS',{sheet,no,kind});
-    form.submit();
-  });
-
-  await sleep(800);
+  // Reload data setelah upload (sukses/gagal)
+  await sleep(1000);
   await app.loadAllData();
 }
-
 // Expose class
 window.MonitoringSystem = MonitoringSystem;

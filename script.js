@@ -353,7 +353,7 @@ async function updateStatusOnServer({sheet,no,which}){
 }
 
 // =======================================
-// UPLOAD FILE - VERSION SUPER SIMPLE
+// UPLOAD FILE - IFRAME METHOD (NO CORS ERROR)
 // =======================================
 async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
   if (!file) {
@@ -361,70 +361,125 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
     return;
   }
 
-  console.log('🔼 Starting upload...', { sheet, no, kind, file: file.name, size: file.size });
+  console.log('🔼 Starting upload...', { 
+    sheet: sheet, 
+    no: no, 
+    kind: kind, 
+    file: file.name, 
+    size: file.size 
+  });
 
-  try {
-    // ✅ METHOD PALING SIMPLE: Langsung fetch tanpa iframe
-    const formData = new FormData();
-    formData.append('action', 'uploadimage');
-    formData.append('sheet', sheet);
-    formData.append('no_surat_jalan', no);
-    formData.append('kind', kind);
-    formData.append('file', file);
+  return new Promise((resolve) => {
+    // Buat iframe untuk handle response
+    const iframeName = 'uploadFrame_' + Date.now();
+    const iframe = document.createElement('iframe');
+    iframe.name = iframeName;
+    iframe.style.display = 'none';
+    document.body.appendChild(iframe);
 
-    console.log('📤 Sending to GAS...');
+    // Buat form
+    const form = document.createElement('form');
+    form.action = GAS_DIRECT_URL;
+    form.method = 'POST';
+    form.enctype = 'multipart/form-data';
+    form.target = iframeName;
+    form.style.display = 'none';
+
+    // Tambahkan field ke form
+    const addField = (name, value) => {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = name;
+      input.value = value;
+      form.appendChild(input);
+    };
+
+    addField('action', 'uploadimage');
+    addField('sheet', sheet);
+    addField('no_surat_jalan', no);
+    addField('kind', kind);
+
+    // Handle file input - PINDAHKAN input asli ke form
+    const originalParent = inputEl.parentNode;
+    const originalNextSibling = inputEl.nextSibling;
     
-    const response = await fetch(GAS_DIRECT_URL, {
-      method: 'POST',
-      body: formData
-    });
+    // Pindahkan input file asli ke form
+    inputEl.name = 'file';
+    form.appendChild(inputEl);
 
-    console.log('📥 Response received:', response.status);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP ${response.status}`);
-    }
+    // Fungsi cleanup
+    const cleanup = () => {
+      // Hapus iframe dan form
+      if (iframe.parentNode) document.body.removeChild(iframe);
+      if (form.parentNode) document.body.removeChild(form);
+    };
 
-    const text = await response.text();
-    console.log('📄 Response text:', text);
-
-    // Parse HTML response untuk dapatkan script tag
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(text, 'text/html');
-    const script = doc.querySelector('script');
-    
-    if (script) {
-      const scriptContent = script.textContent;
-      const match = scriptContent.match(/window\.parent\.postMessage\(({[^}]+}),/);
-      if (match) {
-        const result = JSON.parse(match[1]);
-        console.log('🎯 Upload result:', result);
-        
-        if (result.ok) {
-          alert('✅ Upload sukses!\nFile tersimpan di Drive.');
-          // Reset input file
-          if (inputEl && inputEl.parentNode) {
-            const newInput = inputEl.cloneNode(true);
-            inputEl.parentNode.replaceChild(newInput, inputEl);
-          }
+    // Fungsi restore input
+    const restoreInput = () => {
+      // Buat input baru untuk menggantikan yang dipindahkan
+      const newInput = document.createElement('input');
+      newInput.type = 'file';
+      newInput.className = 'file-input';
+      newInput.accept = inputEl.accept;
+      
+      // Copy data attributes
+      if (inputEl.dataset.sj) newInput.dataset.sj = inputEl.dataset.sj;
+      if (inputEl.dataset.foto) newInput.dataset.foto = inputEl.dataset.foto;
+      
+      // Tempatkan di posisi semula
+      if (originalParent) {
+        if (originalNextSibling) {
+          originalParent.insertBefore(newInput, originalNextSibling);
         } else {
-          alert('❌ Upload gagal: ' + (result.msg || 'Unknown error'));
+          originalParent.appendChild(newInput);
         }
-      } else {
-        throw new Error('Tidak bisa parse response dari server');
       }
-    } else {
-      throw new Error('Format response tidak dikenali');
-    }
+    };
 
-  } catch (error) {
-    console.error('💥 Upload error:', error);
-    alert('❌ Upload gagal: ' + error.message);
-  }
+    // Event listener untuk message dari iframe
+    const handleMessage = (event) => {
+      // Terima semua message, filter berdasarkan data
+      if (typeof event.data !== 'object' || event.data === null) return;
+      
+      console.log('📨 Message received:', event.data);
+      
+      // Hanya proses jika ada property 'ok'
+      if ('ok' in event.data) {
+        if (event.data.ok) {
+          console.log('✅ Upload sukses:', event.data.url);
+          alert('✅ Upload sukses!\nFile tersimpan di Drive.');
+          restoreInput();
+        } else {
+          console.error('❌ Upload gagal:', event.data.msg);
+          alert('❌ Upload gagal: ' + (event.data.msg || 'Unknown error'));
+          restoreInput();
+        }
+        
+        window.removeEventListener('message', handleMessage);
+        cleanup();
+        resolve();
+      }
+    };
 
-  // Reload data setelah upload (sukses/gagal)
-  await sleep(1000);
-  await app.loadAllData();
+    window.addEventListener('message', handleMessage);
+
+    // Submit form
+    document.body.appendChild(form);
+    console.log('📤 Submitting form to GAS...');
+    form.submit();
+
+    // Safety timeout
+    setTimeout(() => {
+      window.removeEventListener('message', handleMessage);
+      cleanup();
+      restoreInput();
+      alert('❌ Upload gagal: Timeout (15 detik)');
+      resolve();
+    }, 15000);
+
+  }).then(async () => {
+    // Tunggu sebentar lalu reload data
+    await sleep(1500);
+    await app.loadAllData();
+  });
 }
-// Expose class
-window.MonitoringSystem = MonitoringSystem;

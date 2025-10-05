@@ -369,28 +369,33 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
     document.body.appendChild(iframe);
 
     const form = document.createElement('form');
-    form.action = GAS_DIRECT_URL;
-    form.method = 'POST';
+    form.action  = GAS_DIRECT_URL;            // langsung ke Apps Script (bukan proxy)
+    form.method  = 'POST';
     form.enctype = 'multipart/form-data';
-    form.target = iframeName;
+    form.target  = iframeName;
     form.style.display = 'none';
 
     const addHidden = (name, value) => {
-      const input = document.createElement('input');
-      input.type = 'hidden';
-      input.name = name;
-      input.value = value;
-      form.appendChild(input);
+      const inp = document.createElement('input');
+      inp.type  = 'hidden';
+      inp.name  = name;
+      inp.value = value;
+      form.appendChild(inp);
     };
-    addHidden('action','uploadonly');
+    addHidden('action', 'uploadonly');
     addHidden('sheet', sheet);
     addHidden('no_surat_jalan', no);
-    addHidden('kind', kind);
+    addHidden('kind',  kind);
 
-    // pindahkan sementara input file asli
-    const originalParent = inputEl.parentNode;
-    inputEl.name = 'file';
-    form.appendChild(inputEl);
+    // ⬅️ perbaikan utama: JANGAN pindah inputEl asli.
+    // Buat input file sementara & isi files via DataTransfer
+    const tempFileInput = document.createElement('input');
+    tempFileInput.type = 'file';
+    tempFileInput.name = 'file';                    // key yang dibaca GAS: e.files.file
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    tempFileInput.files = dt.files;
+    form.appendChild(tempFileInput);
 
     let messageReceived = false;
 
@@ -399,18 +404,7 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
       try { form.remove(); } catch {}
     };
 
-    const restoreInput = () => {
-      const newInput = document.createElement('input');
-      newInput.type = 'file';
-      newInput.className = 'file-input';
-      newInput.accept = inputEl.accept;
-      if (inputEl.dataset.sj)   newInput.dataset.sj   = inputEl.dataset.sj;
-      if (inputEl.dataset.foto) newInput.dataset.foto = inputEl.dataset.foto;
-      if (originalParent) originalParent.appendChild(newInput);
-    };
-
     const handleMessage = (event) => {
-      // Terima dari mana saja (googleusercontent domain beda-beda)
       const data = event.data;
       console.log('📨 Message received:', event.origin, data);
       if (!data || typeof data !== 'object' || !('ok' in data)) return;
@@ -418,14 +412,11 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
       messageReceived = true;
 
       if (data.ok) {
-        console.log('✅ Upload sukses:', data.url);
-        alert(`✅ Upload sukses!\nBuild: ${data.build || '-'}\nFile tersimpan di Drive & URL ditulis ke sheet.`);
+        alert(`✅ Upload sukses!\nBuild: ${data.build || '-'}\nURL tersimpan di sheet.`);
       } else {
-        console.error('❌ Upload gagal:', data.msg);
         alert('❌ Upload gagal: ' + (data.msg || 'Unknown error'));
       }
 
-      restoreInput();
       cleanup();
       window.removeEventListener('message', handleMessage);
       resolve();
@@ -433,14 +424,11 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
 
     window.addEventListener('message', handleMessage);
 
-    // Fallback: iframe loaded tapi tidak ada postMessage (jarang)
     iframe.addEventListener('load', () => {
-      console.log('🔄 Iframe loaded');
+      // fallback kalau postMessage tidak terkirim
       setTimeout(() => {
         if (!messageReceived) {
-          console.log('⚠️ No message received, assume success? check logs');
           alert('⚠️ Tidak ada balasan. Cek Apps Script logs.');
-          restoreInput();
           cleanup();
           window.removeEventListener('message', handleMessage);
           resolve();
@@ -452,12 +440,10 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
     console.log('📤 Submitting form to:', GAS_DIRECT_URL);
     form.submit();
 
-    // Timeout safety
+    // timeout safety
     setTimeout(() => {
       if (!messageReceived) {
-        console.log('⏰ Timeout reached');
         alert('❌ Upload timeout - cek Apps Script Execution logs');
-        restoreInput();
         cleanup();
         window.removeEventListener('message', handleMessage);
         resolve();
@@ -468,6 +454,7 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
     await app.loadAllData();
   });
 }
+
 
 // =======================================
 // BOOT

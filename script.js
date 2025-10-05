@@ -354,116 +354,63 @@ async function updateStatusOnServer({sheet,no,which}){
 }
 
 // =======================================
-// UPLOAD FILE (FINAL PATCHED VERSION)
+// UPLOAD FILE (via BASE64 + google apps script doPost)
 // =======================================
 async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
-  if (!file) { 
-    alert('Pilih file terlebih dahulu.'); 
-    return; 
+  if (!file) { alert('Pilih file terlebih dahulu.'); return; }
+
+  // Validasi dasar (samakan dg server)
+  const okMime = /^(image\/jpeg|image\/png|application\/pdf)$/i.test(file.type);
+  if (kind === 'SURAT_JALAN') {
+    if (!okMime) return alert('Tipe berkas harus JPG/PNG/PDF.');
+  } else {
+    if (!/^image\/(jpeg|png)$/i.test(file.type)) return alert('Foto unit harus JPG/PNG.');
+  }
+  if (file.size > 10 * 1024 * 1024) return alert('Ukuran maksimal 10 MB.');
+
+  // Tampilkan status ringan
+  console.log('🔼 Upload (b64) mulai…', { sheet, no, kind, name: file.name, type: file.type, size: file.size });
+
+  // 1) Baca file ⇒ base64
+  const fileB64 = await new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onerror = () => reject(new Error('Gagal membaca file.'));
+    r.onload = () => {
+      const dataUrl = String(r.result || '');
+      const base64 = dataUrl.split(',')[1] || '';
+      resolve(base64);
+    };
+    r.readAsDataURL(file);
+  });
+
+  // 2) Kirim ke Apps Script (pakai proxy CORS yang sudah ada)
+  const fd = new FormData();
+  fd.append('action', 'upload_b64');
+  fd.append('sheet', sheet);
+  fd.append('no_surat_jalan', no);
+  fd.append('kind', kind);
+  fd.append('filename', file.name);
+  fd.append('mime', file.type || 'application/octet-stream');
+  fd.append('file_b64', fileB64);
+
+  let resp, json;
+  try {
+    resp = await fetch(SCRIPT_URL, { method: 'POST', body: fd });
+    json = await resp.json();
+  } catch (err) {
+    console.error('❌ Gagal call GAS:', err);
+    alert('Gagal menghubungi server upload.');
+    return;
   }
 
-  console.log('🔼 Starting upload...', { sheet, no, kind, file: file.name, size: file.size });
-
-  return new Promise((resolve) => {
-    // 1) Buat iframe untuk response
-    const iframeName = 'uploadFrame_' + Date.now();
-    const iframe = document.createElement('iframe');
-    iframe.name = iframeName;
-    iframe.style.display = 'none';
-    document.body.appendChild(iframe);
-
-    // 2) Buat form baru
-    const form = document.createElement('form');
-    form.action = GAS_DIRECT_URL;
-    form.method = 'POST';
-    form.enctype = 'multipart/form-data';
-    form.target = iframeName;
-    form.style.display = 'none';
-
-    // 3) Hidden fields
-    const addHidden = (name, value) => {
-      const inp = document.createElement('input');
-      inp.type = 'hidden';
-      inp.name = name;
-      inp.value = value;
-      form.appendChild(inp);
-    };
-    addHidden('action', 'uploadonly');
-    addHidden('sheet', sheet);
-    addHidden('no_surat_jalan', no);
-    addHidden('kind', kind);
-
-    // 4) Pindahkan input file asli ke form
-    if (inputEl) {
-      inputEl.name = 'file'; // Wajib sesuai e.files.file di GAS
-      form.appendChild(inputEl);
-    }
-
-    document.body.appendChild(form);
-
-    let messageReceived = false;
-
-    const cleanup = () => {
-      try { iframe.remove(); } catch {}
-      try { form.remove(); } catch {}
-      // Kembalikan inputEl ke card biar UI tetap ada
-      if (inputEl) {
-        const container = document.querySelector(`[data-upload-sj="${CSS.escape(no)}"],[data-upload-foto="${CSS.escape(no)}"]`)?.closest('.card');
-        if (container) {
-          const fileWrapper = container.querySelector('.flex input[type=file]');
-          if (fileWrapper) fileWrapper.replaceWith(inputEl);
-        }
-        inputEl.value = ''; // reset
-      }
-    };
-
-    const handleMessage = (event) => {
-      const data = event.data;
-      if (!data || typeof data !== 'object' || !('ok' in data)) return;
-      messageReceived = true;
-
-      console.log('📨 Message received:', data);
-      if (data.ok) {
-        alert(`✅ Upload sukses!\nBuild: ${data.build || '-'}`);
-      } else {
-        alert('❌ Upload gagal: ' + (data.msg || 'Unknown error'));
-      }
-
-      window.removeEventListener('message', handleMessage);
-      cleanup();
-      resolve();
-    };
-
-    window.addEventListener('message', handleMessage);
-
-    // Fallback timeout jika iframe load tapi tidak ada postMessage
-    iframe.addEventListener('load', () => {
-      setTimeout(() => {
-        if (!messageReceived) {
-          console.warn('⚠️ No message received from GAS');
-          alert('⚠️ Tidak ada balasan langsung. Cek sheet apakah URL sudah masuk.');
-          window.removeEventListener('message', handleMessage);
-          cleanup();
-          resolve();
-        }
-      }, 5000);
-    });
-
-    console.log('📤 Submitting form to:', GAS_DIRECT_URL);
-    form.submit();
-
-    // Safety timeout
-    setTimeout(() => {
-      if (!messageReceived) {
-        console.warn('⏰ Upload timeout');
-        alert('❌ Upload timeout - cek koneksi internet');
-        window.removeEventListener('message', handleMessage);
-        cleanup();
-        resolve();
-      }
-    }, 30000);
-  }).then(async () => {
-    await sleep(1500);
+  console.log('📨 Respon upload:', json);
+  if (json && json.ok) {
+    alert('✅ Upload sukses!');
+    if (inputEl) inputEl.value = '';
+    // refresh data agar URL tampil
+    await sleep(1200);
     await app.loadAllData();
-  });
+  } else {
+    alert('❌ Upload gagal: ' + (json && json.msg ? json.msg : 'Unknown error'));
+  }
 }

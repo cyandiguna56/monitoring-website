@@ -354,7 +354,7 @@ async function updateStatusOnServer({sheet,no,which}){
 }
 
 // =======================================
-// UPLOAD FILE (iframe + postMessage)
+// UPLOAD FILE (FIXED VERSION - PAKAI INI)
 // =======================================
 async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
   if (!file) { alert('Pilih file terlebih dahulu.'); return; }
@@ -362,23 +362,22 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
   console.log('🔼 Starting upload...', { sheet, no, kind, file: file.name, size: file.size });
 
   return new Promise((resolve) => {
-    // 1) siapkan iframe target
+    // 1) Buat iframe untuk response
     const iframeName = 'uploadFrame_' + Date.now();
     const iframe = document.createElement('iframe');
     iframe.name = iframeName;
     iframe.style.display = 'none';
     document.body.appendChild(iframe);
 
-    // 2) siapkan form tersembunyi
+    // 2) Buat form baru
     const form = document.createElement('form');
-    const formId = 'gasForm_' + Date.now();
-    form.id = formId;
-    form.action  = GAS_DIRECT_URL;           // langsung ke Apps Script
-    form.method  = 'POST';
+    form.action = GAS_DIRECT_URL;
+    form.method = 'POST';
     form.enctype = 'multipart/form-data';
-    form.target  = iframeName;
+    form.target = iframeName;
     form.style.display = 'none';
 
+    // 3) Tambahkan hidden fields
     const addHidden = (name, value) => {
       const inp = document.createElement('input');
       inp.type = 'hidden';
@@ -386,26 +385,28 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
       inp.value = value;
       form.appendChild(inp);
     };
+
     addHidden('action', 'uploadonly');
     addHidden('sheet', sheet);
     addHidden('no_surat_jalan', no);
-    addHidden('kind',  kind);
+    addHidden('kind', kind);
 
-    // 3) kaitkan input file ASLI ke form dengan atribut `form` (tanpa dipindah!)
-    const prevFormAttr = inputEl.getAttribute('form');   // simpan keadaan awal
-    const prevNameAttr = inputEl.getAttribute('name');
-    inputEl.setAttribute('form', formId);
-    inputEl.setAttribute('name', 'file');                // key yang GAS baca: e.files.file
+    // 4) BUAT FILE INPUT BARU & TRANSFER FILE (SOLUSI PENTING!)
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.name = 'file'; // Wajib 'file' sesuai e.files.file di GAS
+    
+    // Transfer file menggunakan DataTransfer
+    const dataTransfer = new DataTransfer();
+    dataTransfer.items.add(file);
+    fileInput.files = dataTransfer.files;
+    
+    form.appendChild(fileInput);
+    document.body.appendChild(form);
 
     let messageReceived = false;
 
     const cleanup = () => {
-      // lepas kaitan input file dari form
-      if (prevFormAttr !== null) inputEl.setAttribute('form', prevFormAttr);
-      else inputEl.removeAttribute('form');
-      if (prevNameAttr !== null) inputEl.setAttribute('name', prevNameAttr);
-      else inputEl.removeAttribute('name');
-
       try { iframe.remove(); } catch {}
       try { form.remove(); } catch {}
     };
@@ -415,9 +416,11 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
       if (!data || typeof data !== 'object' || !('ok' in data)) return;
       messageReceived = true;
 
-      console.log('📨 Message received:', event.origin, data);
+      console.log('📨 Message received:', data);
       if (data.ok) {
-        alert(`✅ Upload sukses!\nBuild: ${data.build || '-'}\nURL tersimpan di sheet.`);
+        alert(`✅ Upload sukses!\nBuild: ${data.build || '-'}`);
+        // Clear input file asli
+        if (inputEl) inputEl.value = '';
       } else {
         alert('❌ Upload gagal: ' + (data.msg || 'Unknown error'));
       }
@@ -429,42 +432,34 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
 
     window.addEventListener('message', handleMessage);
 
+    // Fallback timeout
     iframe.addEventListener('load', () => {
-      // fallback jika postMessage tak terkirim
       setTimeout(() => {
         if (!messageReceived) {
           console.warn('⚠️ No message received from GAS');
-          alert('⚠️ Tidak ada balasan. Cek Apps Script logs.');
+          alert('⚠️ Tidak ada balasan langsung. Cek sheet apakah URL sudah masuk.');
           window.removeEventListener('message', handleMessage);
           cleanup();
           resolve();
         }
-      }, 3000);
+      }, 5000);
     });
 
-    document.body.appendChild(form);
     console.log('📤 Submitting form to:', GAS_DIRECT_URL);
     form.submit();
 
-    // timeout safety
+    // Safety timeout
     setTimeout(() => {
       if (!messageReceived) {
         console.warn('⏰ Upload timeout');
-        alert('❌ Upload timeout - cek Apps Script Execution logs');
+        alert('❌ Upload timeout - cek koneksi internet');
         window.removeEventListener('message', handleMessage);
         cleanup();
         resolve();
       }
-    }, 20000);
+    }, 30000);
   }).then(async () => {
     await sleep(1500);
     await app.loadAllData();
   });
 }
-
-
-
-// =======================================
-// BOOT
-// =======================================
-const app = new MonitoringSystem();

@@ -3,7 +3,7 @@
 // =======================================
 const SCRIPT_URL = 'https://cors-proxy-apps-script.cyandiguna56.workers.dev/';
 const GAS_DIRECT_URL =
-  'https://script.google.com/macros/s/AKfycbxZeGmmvDlhZgufRjA-yg4s3CmfATzEE8dl_T8iYxeSzs_SBa2Yt2m86oeG5D-NcGDooQ/exec';
+  'https://script.google.com/macros/s/AKfycbzoq8WH2Z8xZ_JNe4L27iRqCz0biWI_8rbsyuMUd-bUZF53VHqhSx_sBOpFWZcq_BCnXw/exec';
 const SHEETS = ['MONITORING PISANG','MONITORING LOKAL','MONITORING FMCG','MONITORING IMPORT'];
 
 // =======================================

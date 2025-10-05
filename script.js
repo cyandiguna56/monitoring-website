@@ -353,64 +353,76 @@ async function updateStatusOnServer({sheet,no,which}){
   if(!res.ok){ console.warn('POST updateStatus gagal, status:',res.status); alert('Gagal mengirim perintah ke server (updateStatus).'); }
 }
 
-// =======================================
-// UPLOAD FILE (via BASE64 + google apps script doPost)
-// =======================================
+// ====== BRIDGE CONFIG ======
+const GAS_BRIDGE_URL = 'https://script.google.com/macros/s/AKfycbxwDUBb-zH7PVFrrMOLtHdg3FrbtyjDqUbMit_IaO-w4olNdqaBiy6ZlCwI8A9s7mGY/exec'; // URL Web App yang serve bridge.html
+
+let _bridgeFrame, _bridgeReady = false;
+function ensureBridge() {
+  if (_bridgeFrame) return;
+  _bridgeFrame = document.createElement('iframe');
+  _bridgeFrame.src = GAS_BRIDGE_URL;   // ini memuat bridge.html
+  _bridgeFrame.style.display = 'none';
+  document.body.appendChild(_bridgeFrame);
+  _bridgeReady = true; // HtmlService muat sangat cepat; cukup flag sederhana
+}
+
+// Kirim ke bridge dan tunggu balasan (promise)
+function bridgePost(payload, timeoutMs = 30000) {
+  ensureBridge();
+  return new Promise((resolve, reject) => {
+    let done = false;
+    const onMsg = (ev) => {
+      const data = ev.data || {};
+      if (!data || data.__bridge !== 'UPLOAD') return;
+      done = true;
+      window.removeEventListener('message', onMsg);
+      resolve(data);
+    };
+    window.addEventListener('message', onMsg);
+    _bridgeFrame.contentWindow.postMessage({ __bridge:'UPLOAD', payload }, '*');
+    setTimeout(() => {
+      if (!done) {
+        window.removeEventListener('message', onMsg);
+        reject(new Error('Timeout menunggu balasan bridge'));
+      }
+    }, timeoutMs);
+  });
+}
+
+// ====== Panggilan dari kartu UI kamu ======
 async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
   if (!file) { alert('Pilih file terlebih dahulu.'); return; }
 
-  // Validasi dasar (samakan dg server)
-  const okMime = /^(image\/jpeg|image\/png|application\/pdf)$/i.test(file.type);
-  if (kind === 'SURAT_JALAN') {
-    if (!okMime) return alert('Tipe berkas harus JPG/PNG/PDF.');
-  } else {
-    if (!/^image\/(jpeg|png)$/i.test(file.type)) return alert('Foto unit harus JPG/PNG.');
-  }
-  if (file.size > 10 * 1024 * 1024) return alert('Ukuran maksimal 10 MB.');
-
-  // Tampilkan status ringan
-  console.log('🔼 Upload (b64) mulai…', { sheet, no, kind, name: file.name, type: file.type, size: file.size });
-
-  // 1) Baca file ⇒ base64
-  const fileB64 = await new Promise((resolve, reject) => {
+  // baca sebagai base64
+  const file_b64 = await new Promise((res, rej) => {
     const r = new FileReader();
-    r.onerror = () => reject(new Error('Gagal membaca file.'));
-    r.onload = () => {
-      const dataUrl = String(r.result || '');
-      const base64 = dataUrl.split(',')[1] || '';
-      resolve(base64);
-    };
+    r.onload = e => res(String(e.target.result).split(',')[1]);
+    r.onerror = rej;
     r.readAsDataURL(file);
   });
 
-  // 2) Kirim ke Apps Script (pakai proxy CORS yang sudah ada)
-  const fd = new FormData();
-  fd.append('action', 'upload_b64');
-  fd.append('sheet', sheet);
-  fd.append('no_surat_jalan', no);
-  fd.append('kind', kind);
-  fd.append('filename', file.name);
-  fd.append('mime', file.type || 'application/octet-stream');
-  fd.append('file_b64', fileB64);
-
-  let resp, json;
+  // kirim ke bridge
   try {
-    resp = await fetch(SCRIPT_URL, { method: 'POST', body: fd });
-    json = await resp.json();
-  } catch (err) {
-    console.error('❌ Gagal call GAS:', err);
-    alert('Gagal menghubungi server upload.');
-    return;
-  }
+    const resp = await bridgePost({
+      file_b64,
+      filename: file.name,
+      mime: file.type || 'application/octet-stream',
+      sheet,
+      no_surat_jalan: no,
+      kind // 'SURAT_JALAN' atau 'FOTO_UNIT'
+    });
 
-  console.log('📨 Respon upload:', json);
-  if (json && json.ok) {
-    alert('✅ Upload sukses!');
-    if (inputEl) inputEl.value = '';
-    // refresh data agar URL tampil
-    await sleep(1200);
-    await app.loadAllData();
-  } else {
-    alert('❌ Upload gagal: ' + (json && json.msg ? json.msg : 'Unknown error'));
+    if (resp.ok) {
+      alert('✅ Upload sukses!');
+      if (inputEl) inputEl.value = '';
+      // refresh data kartu
+      await sleep(800);
+      await app.loadAllData();
+    } else {
+      alert('❌ Upload gagal: ' + (resp.msg || 'Unknown error'));
+    }
+  } catch (err) {
+    alert('❌ Error: ' + err.message);
   }
 }
+

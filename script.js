@@ -3,7 +3,7 @@
 // =======================================
 const SCRIPT_URL = 'https://cors-proxy-apps-script.cyandiguna56.workers.dev/';
 const GAS_DIRECT_URL =
-  'https://script.google.com/macros/s/AKfycbzoq8WH2Z8xZ_JNe4L27iRqCz0biWI_8rbsyuMUd-bUZF53VHqhSx_sBOpFWZcq_BCnXw/exec';
+  'https://script.google.com/macros/s/AKfycbxwDUBb-zH7PVFrrMOLtHdg3FrbtyjDqUbMit_IaO-w4olNdqaBiy6ZlCwI8A9s7mGY/exec';
 const SHEETS = ['MONITORING PISANG','MONITORING LOKAL','MONITORING FMCG','MONITORING IMPORT'];
 
 // =======================================
@@ -354,10 +354,13 @@ async function updateStatusOnServer({sheet,no,which}){
 }
 
 // =======================================
-// UPLOAD FILE (FIXED VERSION - PAKAI INI)
+// UPLOAD FILE (FINAL PATCHED VERSION)
 // =======================================
 async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
-  if (!file) { alert('Pilih file terlebih dahulu.'); return; }
+  if (!file) { 
+    alert('Pilih file terlebih dahulu.'); 
+    return; 
+  }
 
   console.log('🔼 Starting upload...', { sheet, no, kind, file: file.name, size: file.size });
 
@@ -377,7 +380,7 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
     form.target = iframeName;
     form.style.display = 'none';
 
-    // 3) Tambahkan hidden fields
+    // 3) Hidden fields
     const addHidden = (name, value) => {
       const inp = document.createElement('input');
       inp.type = 'hidden';
@@ -385,23 +388,17 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
       inp.value = value;
       form.appendChild(inp);
     };
-
     addHidden('action', 'uploadonly');
     addHidden('sheet', sheet);
     addHidden('no_surat_jalan', no);
     addHidden('kind', kind);
 
-    // 4) BUAT FILE INPUT BARU & TRANSFER FILE (SOLUSI PENTING!)
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.name = 'file'; // Wajib 'file' sesuai e.files.file di GAS
-    
-    // Transfer file menggunakan DataTransfer
-    const dataTransfer = new DataTransfer();
-    dataTransfer.items.add(file);
-    fileInput.files = dataTransfer.files;
-    
-    form.appendChild(fileInput);
+    // 4) Pindahkan input file asli ke form
+    if (inputEl) {
+      inputEl.name = 'file'; // Wajib sesuai e.files.file di GAS
+      form.appendChild(inputEl);
+    }
+
     document.body.appendChild(form);
 
     let messageReceived = false;
@@ -409,6 +406,15 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
     const cleanup = () => {
       try { iframe.remove(); } catch {}
       try { form.remove(); } catch {}
+      // Kembalikan inputEl ke card biar UI tetap ada
+      if (inputEl) {
+        const container = document.querySelector(`[data-upload-sj="${CSS.escape(no)}"],[data-upload-foto="${CSS.escape(no)}"]`)?.closest('.card');
+        if (container) {
+          const fileWrapper = container.querySelector('.flex input[type=file]');
+          if (fileWrapper) fileWrapper.replaceWith(inputEl);
+        }
+        inputEl.value = ''; // reset
+      }
     };
 
     const handleMessage = (event) => {
@@ -419,8 +425,6 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
       console.log('📨 Message received:', data);
       if (data.ok) {
         alert(`✅ Upload sukses!\nBuild: ${data.build || '-'}`);
-        // Clear input file asli
-        if (inputEl) inputEl.value = '';
       } else {
         alert('❌ Upload gagal: ' + (data.msg || 'Unknown error'));
       }
@@ -432,7 +436,7 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
 
     window.addEventListener('message', handleMessage);
 
-    // Fallback timeout
+    // Fallback timeout jika iframe load tapi tidak ada postMessage
     iframe.addEventListener('load', () => {
       setTimeout(() => {
         if (!messageReceived) {

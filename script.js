@@ -125,7 +125,8 @@ class MonitoringSystem{
   }
 
   async fetchSheet(sheetName){
-    const url = `${SCRIPT_URL}?action=readSheet&sheet=${encodeURIComponent(sheetName)}`;
+    // ⬇️ action=readsheet (huruf kecil) biar cocok dg doGet
+    const url = `${SCRIPT_URL}?action=readsheet&sheet=${encodeURIComponent(sheetName)}`;
     const ctrl=new AbortController(); const to=setTimeout(()=>ctrl.abort(),20000);
     const res=await fetch(url,{signal:ctrl.signal}); clearTimeout(to);
     if(!res.ok) throw new Error(`HTTP ${res.status} saat GET sheet ${sheetName}`);
@@ -343,7 +344,7 @@ class MonitoringSystem{
 // SERVER CALLS (FINAL)
 // =======================================
 async function updateStatusOnServer({sheet,no,which}){
-  const getUrl = `${SCRIPT_URL}?action=updateStatus&sheet=${encodeURIComponent(sheet)}&no_surat_jalan=${encodeURIComponent(no)}&which=${encodeURIComponent(which)}`;
+  const getUrl = `${SCRIPT_URL}?action=updatestatus&sheet=${encodeURIComponent(sheet)}&no_surat_jalan=${encodeURIComponent(no)}&which=${encodeURIComponent(which)}`;
   try{ const r=await fetch(getUrl,{method:'GET'}); if(r.ok) return; }catch(_){}
   const fd=new FormData();
   fd.append('action','updateStatus'); fd.append('sheet',sheet);
@@ -353,13 +354,10 @@ async function updateStatusOnServer({sheet,no,which}){
 }
 
 // =======================================
-// UPLOAD FILE - SUPER SIMPLE VERSION
+// UPLOAD FILE (iframe + postMessage)
 // =======================================
 async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
-  if (!file) {
-    alert('Pilih file terlebih dahulu.');
-    return;
-  }
+  if (!file) { alert('Pilih file terlebih dahulu.'); return; }
 
   console.log('🔼 Starting upload...', { sheet, no, kind, file: file.name, size: file.size });
 
@@ -377,23 +375,19 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
     form.target = iframeName;
     form.style.display = 'none';
 
-    // ✅ SEDERHANA: Tambahkan field satu per satu
-    const fields = [
-      ['action', 'uploadonly'],
-      ['sheet', sheet],
-      ['no_surat_jalan', no],
-      ['kind', kind]
-    ];
-
-    fields.forEach(([name, value]) => {
+    const addHidden = (name, value) => {
       const input = document.createElement('input');
       input.type = 'hidden';
       input.name = name;
       input.value = value;
       form.appendChild(input);
-    });
+    };
+    addHidden('action','uploadonly');
+    addHidden('sheet', sheet);
+    addHidden('no_surat_jalan', no);
+    addHidden('kind', kind);
 
-    // ✅ SEDERHANA: Gunakan input file asli (pindahkan sementara)
+    // pindahkan sementara input file asli
     const originalParent = inputEl.parentNode;
     inputEl.name = 'file';
     form.appendChild(inputEl);
@@ -401,8 +395,8 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
     let messageReceived = false;
 
     const cleanup = () => {
-      if (iframe.parentNode) iframe.remove();
-      if (form.parentNode) form.remove();
+      try { iframe.remove(); } catch {}
+      try { form.remove(); } catch {}
     };
 
     const restoreInput = () => {
@@ -410,43 +404,42 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
       newInput.type = 'file';
       newInput.className = 'file-input';
       newInput.accept = inputEl.accept;
-      if (inputEl.dataset.sj) newInput.dataset.sj = inputEl.dataset.sj;
+      if (inputEl.dataset.sj)   newInput.dataset.sj   = inputEl.dataset.sj;
       if (inputEl.dataset.foto) newInput.dataset.foto = inputEl.dataset.foto;
       if (originalParent) originalParent.appendChild(newInput);
     };
 
     const handleMessage = (event) => {
-      console.log('📨 Message received:', event.origin, event.data);
-      
-      // Terima dari semua origin untuk testing
-      if (event.data && typeof event.data === 'object' && 'ok' in event.data) {
-        messageReceived = true;
-        
-        if (event.data.ok) {
-          console.log('✅ Upload sukses:', event.data.url);
-          alert('✅ Upload sukses!\nFile tersimpan di Google Drive.');
-          restoreInput();
-        } else {
-          console.error('❌ Upload gagal:', event.data.msg);
-          alert('❌ Upload gagal: ' + (event.data.msg || 'Unknown error'));
-          restoreInput();
-        }
-        
-        cleanup();
-        window.removeEventListener('message', handleMessage);
-        resolve();
+      // Terima dari mana saja (googleusercontent domain beda-beda)
+      const data = event.data;
+      console.log('📨 Message received:', event.origin, data);
+      if (!data || typeof data !== 'object' || !('ok' in data)) return;
+
+      messageReceived = true;
+
+      if (data.ok) {
+        console.log('✅ Upload sukses:', data.url);
+        alert(`✅ Upload sukses!\nBuild: ${data.build || '-'}\nFile tersimpan di Drive & URL ditulis ke sheet.`);
+      } else {
+        console.error('❌ Upload gagal:', data.msg);
+        alert('❌ Upload gagal: ' + (data.msg || 'Unknown error'));
       }
+
+      restoreInput();
+      cleanup();
+      window.removeEventListener('message', handleMessage);
+      resolve();
     };
 
     window.addEventListener('message', handleMessage);
 
-    // Fallback: iframe load event
+    // Fallback: iframe loaded tapi tidak ada postMessage (jarang)
     iframe.addEventListener('load', () => {
       console.log('🔄 Iframe loaded');
       setTimeout(() => {
         if (!messageReceived) {
-          console.log('⚠️ No message received, assuming success');
-          alert('⚠️ Upload mungkin berhasil, cek Apps Script logs');
+          console.log('⚠️ No message received, assume success? check logs');
+          alert('⚠️ Tidak ada balasan. Cek Apps Script logs.');
           restoreInput();
           cleanup();
           window.removeEventListener('message', handleMessage);
@@ -463,16 +456,20 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
     setTimeout(() => {
       if (!messageReceived) {
         console.log('⏰ Timeout reached');
-        alert('❌ Upload timeout - Cek Apps Script Execution logs');
+        alert('❌ Upload timeout - cek Apps Script Execution logs');
         restoreInput();
         cleanup();
         window.removeEventListener('message', handleMessage);
         resolve();
       }
-    }, 15000);
-
+    }, 20000);
   }).then(async () => {
-    await sleep(2000);
+    await sleep(1500);
     await app.loadAllData();
   });
 }
+
+// =======================================
+// BOOT
+// =======================================
+const app = new MonitoringSystem();

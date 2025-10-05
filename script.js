@@ -362,14 +362,18 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
   console.log('🔼 Starting upload...', { sheet, no, kind, file: file.name, size: file.size });
 
   return new Promise((resolve) => {
+    // 1) siapkan iframe target
     const iframeName = 'uploadFrame_' + Date.now();
     const iframe = document.createElement('iframe');
     iframe.name = iframeName;
     iframe.style.display = 'none';
     document.body.appendChild(iframe);
 
+    // 2) siapkan form tersembunyi
     const form = document.createElement('form');
-    form.action  = GAS_DIRECT_URL;            // langsung ke Apps Script (bukan proxy)
+    const formId = 'gasForm_' + Date.now();
+    form.id = formId;
+    form.action  = GAS_DIRECT_URL;           // langsung ke Apps Script
     form.method  = 'POST';
     form.enctype = 'multipart/form-data';
     form.target  = iframeName;
@@ -377,8 +381,8 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
 
     const addHidden = (name, value) => {
       const inp = document.createElement('input');
-      inp.type  = 'hidden';
-      inp.name  = name;
+      inp.type = 'hidden';
+      inp.name = name;
       inp.value = value;
       form.appendChild(inp);
     };
@@ -387,50 +391,52 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
     addHidden('no_surat_jalan', no);
     addHidden('kind',  kind);
 
-    // ⬅️ perbaikan utama: JANGAN pindah inputEl asli.
-    // Buat input file sementara & isi files via DataTransfer
-    const tempFileInput = document.createElement('input');
-    tempFileInput.type = 'file';
-    tempFileInput.name = 'file';                    // key yang dibaca GAS: e.files.file
-    const dt = new DataTransfer();
-    dt.items.add(file);
-    tempFileInput.files = dt.files;
-    form.appendChild(tempFileInput);
+    // 3) kaitkan input file ASLI ke form dengan atribut `form` (tanpa dipindah!)
+    const prevFormAttr = inputEl.getAttribute('form');   // simpan keadaan awal
+    const prevNameAttr = inputEl.getAttribute('name');
+    inputEl.setAttribute('form', formId);
+    inputEl.setAttribute('name', 'file');                // key yang GAS baca: e.files.file
 
     let messageReceived = false;
 
     const cleanup = () => {
+      // lepas kaitan input file dari form
+      if (prevFormAttr !== null) inputEl.setAttribute('form', prevFormAttr);
+      else inputEl.removeAttribute('form');
+      if (prevNameAttr !== null) inputEl.setAttribute('name', prevNameAttr);
+      else inputEl.removeAttribute('name');
+
       try { iframe.remove(); } catch {}
       try { form.remove(); } catch {}
     };
 
     const handleMessage = (event) => {
       const data = event.data;
-      console.log('📨 Message received:', event.origin, data);
       if (!data || typeof data !== 'object' || !('ok' in data)) return;
-
       messageReceived = true;
 
+      console.log('📨 Message received:', event.origin, data);
       if (data.ok) {
         alert(`✅ Upload sukses!\nBuild: ${data.build || '-'}\nURL tersimpan di sheet.`);
       } else {
         alert('❌ Upload gagal: ' + (data.msg || 'Unknown error'));
       }
 
-      cleanup();
       window.removeEventListener('message', handleMessage);
+      cleanup();
       resolve();
     };
 
     window.addEventListener('message', handleMessage);
 
     iframe.addEventListener('load', () => {
-      // fallback kalau postMessage tidak terkirim
+      // fallback jika postMessage tak terkirim
       setTimeout(() => {
         if (!messageReceived) {
+          console.warn('⚠️ No message received from GAS');
           alert('⚠️ Tidak ada balasan. Cek Apps Script logs.');
-          cleanup();
           window.removeEventListener('message', handleMessage);
+          cleanup();
           resolve();
         }
       }, 3000);
@@ -443,9 +449,10 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
     // timeout safety
     setTimeout(() => {
       if (!messageReceived) {
+        console.warn('⏰ Upload timeout');
         alert('❌ Upload timeout - cek Apps Script Execution logs');
-        cleanup();
         window.removeEventListener('message', handleMessage);
+        cleanup();
         resolve();
       }
     }, 20000);
@@ -454,6 +461,7 @@ async function uploadFileToDrive({ sheet, no, kind, file, inputEl }) {
     await app.loadAllData();
   });
 }
+
 
 
 // =======================================

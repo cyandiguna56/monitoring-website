@@ -354,23 +354,34 @@ async function updateStatusOnServer({sheet,no,which}){
 }
 
 // ====== BRIDGE CONFIG ======
-const GAS_BRIDGE_URL = 'https://script.google.com/macros/s/AKfycbxwDUBb-zH7PVFrrMOLtHdg3FrbtyjDqUbMit_IaO-w4olNdqaBiy6ZlCwI8A9s7mGY/exec'; // URL Web App yang serve bridge.html
+const GAS_BRIDGE_URL = 'https://script.google.com/macros/s/AKfycbxwDUBb-zH7PVFrrMOLtHdg3FrbtyjDqUbMit_IaO-w4olNdqaBiy6ZlCwI8A9s7mGY/exec';
 
-let _bridgeFrame, _bridgeReady = false;
+let _bridgeFrame;
+let _bridgeReadyPromise = null;
+
 function ensureBridge() {
-  if (_bridgeFrame) return;
-  _bridgeFrame = document.createElement('iframe');
-  _bridgeFrame.src = GAS_BRIDGE_URL;   // ini memuat bridge.html
-  _bridgeFrame.style.display = 'none';
-  document.body.appendChild(_bridgeFrame);
-  _bridgeReady = true; // HtmlService muat sangat cepat; cukup flag sederhana
+  // tunggu iframe siap (onload) sebelum dipakai
+  if (_bridgeFrame && _bridgeFrame.contentWindow) return Promise.resolve();
+  if (_bridgeReadyPromise) return _bridgeReadyPromise;
+
+  _bridgeReadyPromise = new Promise((resolve) => {
+    _bridgeFrame = document.createElement('iframe');
+    _bridgeFrame.src = GAS_BRIDGE_URL;
+    _bridgeFrame.style.display = 'none';
+    _bridgeFrame.onload = () => resolve();
+    document.body.appendChild(_bridgeFrame);
+  });
+
+  return _bridgeReadyPromise;
 }
 
 // Kirim ke bridge dan tunggu balasan (promise)
-function bridgePost(payload, timeoutMs = 30000) {
-  ensureBridge();
+async function bridgePost(payload, timeoutMs = 30000) {
+  await ensureBridge(); // <- pastikan bridge sudah load
+
   return new Promise((resolve, reject) => {
     let done = false;
+
     const onMsg = (ev) => {
       const data = ev.data || {};
       if (!data || data.__bridge !== 'UPLOAD') return;
@@ -378,8 +389,12 @@ function bridgePost(payload, timeoutMs = 30000) {
       window.removeEventListener('message', onMsg);
       resolve(data);
     };
+
     window.addEventListener('message', onMsg);
-    _bridgeFrame.contentWindow.postMessage({ __bridge:'UPLOAD', payload }, '*');
+
+    // kirim setelah listener terpasang & iframe siap
+    _bridgeFrame.contentWindow.postMessage({ __bridge: 'UPLOAD', payload }, '*');
+
     setTimeout(() => {
       if (!done) {
         window.removeEventListener('message', onMsg);

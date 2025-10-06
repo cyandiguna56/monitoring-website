@@ -366,7 +366,7 @@ function ensureBridge() {
 
   _bridgeReadyPromise = new Promise((resolve) => {
     _bridgeFrame = document.createElement('iframe');
-    _bridgeFrame.src = GAS_BRIDGE_URL;
+    _bridgeFrame.src = GAS_BRIDGE_URL + '?page=bridge';
     _bridgeFrame.style.display = 'none';
     _bridgeFrame.onload = () => resolve();
     document.body.appendChild(_bridgeFrame);
